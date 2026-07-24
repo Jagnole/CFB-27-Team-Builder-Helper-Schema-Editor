@@ -29,11 +29,6 @@ runs at the browser layer, where it can.
 - Runs entirely locally. Nothing is sent anywhere except EA's own servers
   (to fetch the team you already have open) and back to your own browser.
 
-## Screenshots
-
-*(Add a screenshot of the editor panel here — Connection / Payload / Structured
-fields / Push back.)*
-
 ## Installation
 
 1. Download this repository as a ZIP (**Code → Download ZIP**) and unzip it
