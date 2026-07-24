@@ -10,12 +10,30 @@ locally captured data in your own browser and does not touch EA's servers.**
 
 ## Why this exists
 
+We need more fonts so dammit, here's every single one in the game.
+Also do you want that perfect Matte finish that Okloahoma State uses on their helmets? Well you can get that too!
+
 Team Builder's JSON payload is the only place that actually controls a team's
 number fonts, name fonts, and helmet materials — but there's no in-game UI for
 most of it, and the raw structure is a maze of nested, inconsistently-named
 fields. Browsers also isolate `ea.com` network traffic from any other site, so
 a plain website can't intercept and edit that data on its own. This extension
 runs at the browser layer, where it can.
+
+## What this won't do
+
+It will not change the colors of the helmet, or numbers, those are decided on the TB website.
+It will not change the spacing of the numbers, that is controlled on the website at this time, you can adjust it on the website
+Not everything will work with each other, a good example is using a ND shell with any color other than Gold or Grey (silver)
+
+## What to expect
+
+You can now pick whichever font and helmet texture you want!!!
+Bugs, there is pre-pre alpha build so keep in mind there may not be some items working
+You can always override things on the website to return things to normal if needed
+
+*Important note: If you pick a font that uses 3 colors, start off by picking a default font on the TB website that has three colors so that they can actually be pulled!*
+
 
 ## Features
 
