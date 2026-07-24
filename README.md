@@ -4,17 +4,19 @@ A Chrome extension that captures and edits EA Sports College Football 27 Team Bu
 
 Not affiliated with or endorsed by EA. Use at your own risk — this edits locally captured data in your own browser and does not touch EA's servers.
 
-Why this exists
+Why this exists:
 
 Team Builder's JSON payload is the only place that actually controls a team's number fonts, name fonts, and helmet materials — but there's no in-game UI for most of it, and the raw structure is a maze of nested, inconsistently-named fields. Browsers also isolate ea.com network traffic from any other site, so a plain website can't intercept and edit that data on its own. This extension runs at the browser layer, where it can.
 
-Features
+Features:
+
 Jersey number font picker — searchable by school name and year ("Boston College (2021)") instead of raw codes (BC_Jersey_2021_NUM_Array). Confirmed working: writes both fields the game actually reads.
 Helmet materials — pick a shell finish by school/year/color and the matching accessory material gets set automatically.
 Reset to loaded — revert every edit back to exactly what was fetched, with one click.
 Runs entirely locally. Nothing is sent anywhere except EA's own servers (to fetch the team you already have open) and back to your own browser.
 
-Installation
+Installation:
+
 Download this repository as a ZIP (Code → Download ZIP) and unzip it somewhere permanent — not your Downloads folder, since Chrome needs to keep reading from that location.
 Open Chrome and go to chrome://extensions.
 Turn on Developer mode (top-right toggle).
@@ -23,7 +25,8 @@ Click the puzzle-piece icon in Chrome's toolbar and pin this extension so its ic
 
 That's it — no build step, no dependencies to install.
 
-Usage
+Usage:
+
 Open your team in EA Sports College Football 27 Team Builder in the browser (any page under team-builder/...), so the page's data request actually fires.
 Click the extension's pinned toolbar icon. This opens the schema editor in a new tab automatically.
 In the editor tab, click Refresh status — it should find your team's data URL.
