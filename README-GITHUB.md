@@ -106,11 +106,6 @@ changed in the editor.
 
 ## Credits
 
-Built by [your name/handle here] with development assistance from Claude
+Built by Tyler (Jagnole) with development assistance from Claude
 (Anthropic). Font and material catalog data compiled by hand from
 in-game asset references.
-
-## License
-
-*(Choose one — MIT is a common default for small tools like this if you want
-others to be able to freely use and modify it.)*
