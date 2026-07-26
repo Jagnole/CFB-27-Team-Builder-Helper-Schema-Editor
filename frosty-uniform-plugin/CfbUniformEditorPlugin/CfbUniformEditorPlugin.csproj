@@ -41,6 +41,8 @@
     <Reference Include="PresentationFramework" />
     <Reference Include="System.Xaml" />
     <Reference Include="WindowsBase" />
+    <!-- Needed for the `dynamic` keyword used in UniformPreviewScreen.cs -->
+    <Reference Include="Microsoft.CSharp" />
   </ItemGroup>
 
   <!--
