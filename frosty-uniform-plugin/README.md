@@ -60,8 +60,10 @@ machine with Visual Studio 2019/2022:
 
 1. Clone this repo. The submodule is optional (source reference only —
    `git submodule update --init --recursive` if you want it).
-2. Copy `FrostySdk.dll`, `FrostyCore.dll`, `FrostyControls.dll`, and
-   `FrostyHash.dll` from your own MMC Editor install into
+2. Copy `FrostySdk.dll`, `FrostyCore.dll`, `FrostyControls.dll`,
+   `FrostyHash.dll`, and the `SharpDX.*` DLLs (`SharpDX.dll`,
+   `SharpDX.Mathematics.dll`, `SharpDX.Direct3D11.dll`, `SharpDX.DXGI.dll`)
+   from your own MMC Editor install into
    `CfbUniformEditorPlugin/FrostyBinaries/` (see the README there — these
    are gitignored, you supply your own copies).
 3. Open `frosty-uniform-plugin/CfbUniformEditorPlugin.sln` in Visual Studio.

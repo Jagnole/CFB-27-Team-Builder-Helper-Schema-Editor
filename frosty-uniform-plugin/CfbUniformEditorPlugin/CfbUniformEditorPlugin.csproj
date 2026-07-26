@@ -71,6 +71,31 @@
   </ItemGroup>
 
   <!--
+    Frosty's viewport/render types (Frosty.Core.Viewport.Screen, IViewport) are backed by SharpDX,
+    so anything touching them — like UniformPreviewScreen.cs — needs these too. Must be the exact
+    SharpDX DLLs your MMC Editor install actually uses (they sit in the same folder as
+    FrostySdk.dll etc.), not a mismatched NuGet version, or types won't line up at runtime.
+  -->
+  <ItemGroup>
+    <Reference Include="SharpDX">
+      <HintPath>FrostyBinaries\SharpDX.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SharpDX.Mathematics">
+      <HintPath>FrostyBinaries\SharpDX.Mathematics.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SharpDX.Direct3D11">
+      <HintPath>FrostyBinaries\SharpDX.Direct3D11.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="SharpDX.DXGI">
+      <HintPath>FrostyBinaries\SharpDX.DXGI.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!--
     Copies the built plugin DLL into <MmcEditorDir>\Plugins\ so Frosty.Core.PluginManager picks
     it up on next launch. MmcEditorDir has no default (every install lives somewhere different) —
     set it via the MMC_EDITOR_DIR environment variable, or override it in a local (gitignored)

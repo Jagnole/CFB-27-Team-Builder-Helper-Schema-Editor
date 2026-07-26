@@ -6,8 +6,9 @@ compiled Frosty assemblies it references (see the `<Reference>` entries with
 `.gitignore` excludes the `.dll`/`.exe` files here, since they're compiled
 binaries from someone else's Frosty build, not this project's code.
 
-Copy these four files here from your own working MMC Editor install
-(wherever `MMCEditor.exe` lives on your machine):
+Copy these files here from your own working MMC Editor install (wherever
+`MMCEditor.exe` lives on your machine — all of them should be sitting right
+next to it, possibly in a `ThirdParty` subfolder for the `SharpDX.*` ones):
 
 ```
 FrostyBinaries/
@@ -15,7 +16,18 @@ FrostyBinaries/
   FrostyCore.dll
   FrostyControls.dll
   FrostyHash.dll
+  SharpDX.dll
+  SharpDX.Mathematics.dll
+  SharpDX.Direct3D11.dll
+  SharpDX.DXGI.dll
 ```
+
+The `SharpDX.*` ones back Frosty's 3D viewport (`Screen`/`IViewport`,
+`Frosty.Core.Controls.FrostyViewport`) — anything in this plugin that touches
+the live-preview viewport (`UniformPreviewScreen.cs`) needs them too. Use the
+exact copies from your MMC Editor install, not some other SharpDX build —
+mismatched versions can compile fine but fail at runtime with type-identity
+errors.
 
 Why these specific binaries and not the vanilla `FrostyToolsuite` submodule
 source: as of writing, only a community fork (MMC Frosty Modding Tools,
