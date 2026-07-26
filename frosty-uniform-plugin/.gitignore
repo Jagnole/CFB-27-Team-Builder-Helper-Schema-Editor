@@ -3,3 +3,8 @@
 **/obj/
 *.user
 *.suo
+
+# Third-party compiled binaries (from your own MMC Editor install) — never commit these,
+# they aren't ours to redistribute. See CfbUniformEditorPlugin/FrostyBinaries/README.md.
+CfbUniformEditorPlugin/FrostyBinaries/*.dll
+CfbUniformEditorPlugin/FrostyBinaries/*.exe

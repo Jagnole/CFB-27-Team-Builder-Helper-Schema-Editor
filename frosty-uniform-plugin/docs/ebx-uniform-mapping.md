@@ -5,6 +5,18 @@
 same slot `MADDEN20SDK.dll` etc. occupy in stock Frosty). This replaces the
 earlier Madden-19/20-derived guess entirely.
 
+That install turned out to be **MMC Frosty Modding Tools `v1.1.0.2`**, a
+community fork distributed via the College Football/Madden modding Discord
+(binary-only release, no public source —
+[repo](https://github.com/bphit4/MMC-Frosty-Modding-Tools/releases/tag/v1.1.0.2)).
+Its `FrostySdk.dll` was analyzed the same way (`monodis`) and confirmed to
+have a real `FrostySdk.ProfileVersion.CollegeFootball27` enum entry, and all
+the plugin-framework classes this project's code depends on
+(`AssetDefinition`, `FrostyAssetEditor`, `Screen`/`FrostyViewport`,
+`ItemModifiedEventArgs`, the plugin-registration attributes) exist unchanged
+from the vanilla `1.0.6.3` API — see `../README.md` for what this plugin
+actually builds against.
+
 ## How this was produced
 
 `COLLEGEFOOTBALL27SDK.dll` is a plain, unobfuscated .NET assembly, so its full

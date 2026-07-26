@@ -43,31 +43,51 @@
     <Reference Include="WindowsBase" />
   </ItemGroup>
 
+  <!--
+    These reference real compiled binaries from an actual CFB27-capable Frosty build
+    (MMC Frosty Modding Tools v1.1.0.2 — FrostySdk.ProfileVersion.CollegeFootball27 confirmed
+    present), NOT the vanilla FrostyToolsuite@1.0.6.3 submodule (which has no CFB27 support at
+    all). See ../README.md: copy FrostySdk.dll/FrostyCore.dll/FrostyControls.dll/FrostyHash.dll
+    from your own MMC Editor install into FrostyBinaries\ next to this csproj — those files are
+    gitignored and never committed, since they're someone else's compiled binaries.
+  -->
   <ItemGroup>
-    <ProjectReference Include="..\FrostyToolsuite\FrostyControls\FrostyControls.csproj">
+    <Reference Include="FrostySdk">
+      <HintPath>FrostyBinaries\FrostySdk.dll</HintPath>
       <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FrostyToolsuite\FrostyHash\FrostyHash.vcxproj">
+    </Reference>
+    <Reference Include="FrostyCore">
+      <HintPath>FrostyBinaries\FrostyCore.dll</HintPath>
       <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FrostyToolsuite\FrostyPlugin\FrostyCore.csproj">
+    </Reference>
+    <Reference Include="FrostyControls">
+      <HintPath>FrostyBinaries\FrostyControls.dll</HintPath>
       <Private>false</Private>
-    </ProjectReference>
-    <ProjectReference Include="..\FrostyToolsuite\FrostySdk\FrostySdk.csproj">
+    </Reference>
+    <Reference Include="FrostyHash">
+      <HintPath>FrostyBinaries\FrostyHash.dll</HintPath>
       <Private>false</Private>
-    </ProjectReference>
+    </Reference>
   </ItemGroup>
 
   <!--
-    Copies the built plugin DLL into the Plugins folder next to FrostyEditor.exe so
-    Frosty.Core.PluginManager picks it up on next launch. This assumes you built
-    FrostyEditor.sln (in ..\FrostyToolsuite\FrostyEditor) with the SAME
-    Configuration|Platform (e.g. "Developer - Debug|x64") so $(OutDir) lines up
-    with where FrostyEditor.exe actually landed. See ../README.md.
+    Copies the built plugin DLL into <MmcEditorDir>\Plugins\ so Frosty.Core.PluginManager picks
+    it up on next launch. MmcEditorDir has no default (every install lives somewhere different) —
+    set it via the MMC_EDITOR_DIR environment variable, or override it in a local (gitignored)
+    CfbUniformEditorPlugin.csproj.user file. Without it, the build still succeeds; you'd just copy
+    CfbUniformEditorPlugin.dll into the Plugins folder next to MMCEditor.exe by hand.
   -->
-  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
-    <MakeDir Directories="$(ProjectDir)..\FrostyToolsuite\FrostyEditor\$(OutDir)Plugins\" Condition="!Exists('$(ProjectDir)..\FrostyToolsuite\FrostyEditor\$(OutDir)Plugins\')" />
-    <Exec Command="xcopy /Y &quot;$(TargetPath)&quot; &quot;$(ProjectDir)..\FrostyToolsuite\FrostyEditor\$(OutDir)Plugins\&quot;" />
+  <PropertyGroup Condition="'$(MmcEditorDir)' == ''">
+    <MmcEditorDir>$(MMC_EDITOR_DIR)</MmcEditorDir>
+  </PropertyGroup>
+
+  <Target Name="PostBuildCopyToMmcEditor" AfterTargets="PostBuildEvent" Condition="'$(MmcEditorDir)' != ''">
+    <MakeDir Directories="$(MmcEditorDir)\Plugins\" Condition="!Exists('$(MmcEditorDir)\Plugins\')" />
+    <Exec Command="xcopy /Y &quot;$(TargetPath)&quot; &quot;$(MmcEditorDir)\Plugins\&quot;" />
+  </Target>
+
+  <Target Name="PostBuildNoticeIfNoMmcEditorDir" AfterTargets="PostBuildEvent" Condition="'$(MmcEditorDir)' == ''">
+    <Message Importance="high" Text="MmcEditorDir is not set, so $(TargetPath) was not copied anywhere. Set the MMC_EDITOR_DIR environment variable to your MMC Editor install folder to auto-copy on build, or copy the DLL into its Plugins folder by hand." />
   </Target>
 
 </Project>

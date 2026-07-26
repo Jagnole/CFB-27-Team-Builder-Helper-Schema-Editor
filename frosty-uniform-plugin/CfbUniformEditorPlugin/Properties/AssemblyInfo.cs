@@ -1,4 +1,5 @@
 ﻿using CfbUniformEditorPlugin;
+using FrostySdk;
 using Frosty.Core.Attributes;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -17,12 +18,12 @@ using System.Windows;
 [assembly: PluginAuthor("Jagnole")]
 [assembly: PluginVersion("0.1.0.0")]
 
-// No ProfileVersion entry exists yet for College Football 27 in FrostySdk.ProfileVersion on the
-// 1.0.6.3 branch, so there is nothing to gate this plugin on with [PluginValidForProfile] until a
-// real CFB27 profile/SDK is built (see ../../docs/ebx-uniform-mapping.md). That means this plugin
-// currently loads for every game profile. Once a CFB27 ProfileVersion exists, add:
-//   [assembly: PluginValidForProfile((int)ProfileVersion.Cfb27)]
+// ProfileVersion.CollegeFootball27 is a real, confirmed enum entry in the MMC Frosty Modding
+// Tools v1.1.0.2 FrostySdk.dll this plugin now builds against (see ../../README.md and
+// ../../docs/ebx-uniform-mapping.md) — so, unlike the vanilla 1.0.6.3 submodule, there's something
+// real to gate on.
+[assembly: PluginValidForProfile((int)ProfileVersion.CollegeFootball27)]
 
-// UniformSchema.RootEbxTypeName is a placeholder (see UniformSchema.cs) — replace it with the
-// real Ebx class name once it's identified from an actual CFB27 dump.
+// UniformSchema.RootEbxTypeName is a real Ebx type (UniformVisuals), confirmed from the profile
+// SDK's IL metadata — see UniformSchema.cs and docs/ebx-uniform-mapping.md.
 [assembly: RegisterAssetDefinition(UniformSchema.RootEbxTypeName, typeof(UniformAssetDefinition))]
