@@ -20,13 +20,13 @@ frosty-uniform-plugin/
   CfbUniformEditorPlugin/       the plugin project itself
     CfbUniformEditorPlugin.csproj
     Properties/AssemblyInfo.cs   plugin registration attributes
-    UniformSchema.cs             placeholder ebx type/field name constants
+    UniformSchema.cs             confirmed ebx type/field name constants (see docs/)
     UniformAssetDefinition.cs    hooks the editor into Frosty's asset system
     FrostyUniformEditor.cs       docked editor: property grid + live-preview viewport
     UniformPreviewScreen.cs      placeholder render screen (see docs/ebx-uniform-mapping.md)
     Themes/Generic.xaml          WPF control template for the editor
   CfbUniformEditorPlugin.sln    solution referencing FrostyEditor + this plugin
-  docs/ebx-uniform-mapping.md  provisional uniform-asset field mapping
+  docs/ebx-uniform-mapping.md  confirmed uniform-asset field mapping (from a real profile DLL)
 ```
 
 ## Building (Windows only)
@@ -52,42 +52,52 @@ with Visual Studio 2019/2022:
      rebuild the plugin with the matching one too, or the post-build xcopy
      will create a `Plugins` folder next to the wrong output directory.
 5. Run `FrostyToolsuite/FrostyEditor/bin/Developer/Debug/FrostyEditor.exe`.
-   The plugin currently has no `[PluginValidForProfile]` restriction (see
-   below), so it loads regardless of which game profile you open — though
-   right now it won't actually attach to any real asset until the ebx type
-   name in `UniformSchema.RootEbxTypeName` is filled in.
+   The plugin has no `[PluginValidForProfile]` restriction (see below), so it
+   loads regardless of which game profile you open. `UniformSchema.RootEbxTypeName`
+   is now set to a real ebx type (`UniformVisuals`) — but this vanilla
+   `1.0.6.3` build still has no CFB 27 profile to actually open a CFB 27
+   install and hand you one, see blocker #1 below.
 
 ## Known blockers before this can do anything real
 
-1. **No CFB 27 game profile exists in Frosty.** The `1.0.6.3` branch ships
-   compiled per-game SDK profiles (`FrostySdk/Profiles/*.dll` —
-   `MADDEN19SDK.dll`, `MADDEN20SDK.dll`, `FIFA20SDK.dll`, etc.) but nothing
-   for College Football 27. Without one, Frosty can't mount a CFB 27 install,
-   list its bundles, or read any ebx at all — that's a separate, larger
-   reverse-engineering effort (bundle/superbundle layout, type hashing, a
-   `ProfileVersion` entry, an `IProfile` implementation) that has to happen
-   before this plugin can be pointed at real game data.
-2. **The uniform ebx field mapping is a guess.** See
-   [`docs/ebx-uniform-mapping.md`](docs/ebx-uniform-mapping.md) — it's ported
-   from Madden 19/20 (the closest existing Frosty profile, same football/
-   Frostbite lineage) via a `strings` pass over the compiled SDK DLLs, not
-   from any real CFB 27 data. `UniformSchema.RootEbxTypeName` is a literal
-   placeholder (`Cfb27TeamUniformAsset_TODO`) that matches nothing until you
-   replace it.
-3. **The live preview is a stub.** `UniformPreviewScreen` just clears the
-   viewport to a flat color (best-effort read of `UniformPrimaryColor`/
-   `UniformSecondaryColor`, falling back silently if the field shape doesn't
-   match the guess). Real mesh/material rendering — the actual "live preview
-   of the uniform" — needs the real CFB27 mesh/texture resource types, which
-   also aren't known yet. `Plugins/MeshSetPlugin/Screens/MultiMeshPreviewScreen.cs`
+1. **This vendored `1.0.6.3` submodule still has no CFB 27 profile built in.**
+   A real `COLLEGEFOOTBALL27SDK.dll` profile *does* exist — it came from a
+   Frosty install on the repo owner's machine that already lists CFB 27 in
+   its profile picker — but that install is a different build/fork than the
+   vanilla `CadeEvs/FrostyToolsuite@1.0.6.3` this plugin is scaffolded
+   against. Dropping the DLL into this submodule's `FrostySdk/Profiles/`
+   folder alone won't make vanilla `FrostyEditor` recognize CFB 27 — it also
+   needs a `ProfileVersion` enum entry and the surrounding `IProfile`/bundle-
+   format plumbing that only exists in whatever build the DLL came from.
+   Finding (or being pointed at) that build/fork, and possibly repointing
+   this project's submodule at it, is the next real blocker — separate from
+   the ebx schema work below, which is now done.
+2. **The uniform ebx field mapping is now confirmed, not a guess.** See
+   [`docs/ebx-uniform-mapping.md`](docs/ebx-uniform-mapping.md) — read
+   directly from the real `COLLEGEFOOTBALL27SDK.dll`'s .NET metadata (class
+   names, field names, field *types*) via `monodis`, no game or Frosty
+   install required for this part. `UniformSchema.RootEbxTypeName` is now set
+   to `UniformVisuals`, a real root ebx asset type. What's still unconfirmed
+   is which `LoadoutSlotEnum` values a real team's data actually uses — see
+   the doc's "What's still open" section.
+3. **The live preview is still a stub.** `UniformPreviewScreen` just clears
+   the viewport to a flat color, now reading either of the two confirmed
+   color shapes (`Vec3`'s `x/y/z` or `ColorRgb`'s `R/G/B`, see the doc).
+   Real mesh/material rendering needs the real CFB27 mesh/texture resource
+   types on `CharacterUniformJerseyItem`/`HelmetItem`
+   (`JerseyMaterialMap`/`HelmetColorMap`/etc., all currently unresolved
+   `PointerRef`s) — `Plugins/MeshSetPlugin/Screens/MultiMeshPreviewScreen.cs`
    in the submodule is the pattern to follow once those are identified.
 
 ## Next steps (not done here)
 
-- Get a working CFB 27 profile into Frosty (or confirm one already exists in
-  the modding community) so `FrostyEditor` can actually open the game.
-- Use that access to dump a real uniform ebx asset (Type Explorer /
-  EbxToXmlPlugin, both already in the submodule) and correct
-  `UniformSchema.cs` against it.
+- Identify the Frosty build/fork the `COLLEGEFOOTBALL27SDK.dll` profile came
+  from, and decide whether to repoint this project's submodule at it instead
+  of vanilla `1.0.6.3`.
+- Once Frosty can actually open a CFB 27 install: export a real `TeamVisuals`/
+  `UniformVisuals`/`Loadout` via Type Explorer or `EbxToXmlPlugin` (both
+  already in the submodule) to confirm the open items in
+  `docs/ebx-uniform-mapping.md` (real `LoadoutSlotEnum` values, actual
+  `PointerRef` resource types).
 - Replace `UniformPreviewScreen`'s flat-color stub with a real mesh/material
-  render once the resource types are confirmed.
+  render once those resource types are confirmed.

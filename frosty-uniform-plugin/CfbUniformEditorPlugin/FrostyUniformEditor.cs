@@ -37,29 +37,46 @@ namespace CfbUniformEditorPlugin
             }
         }
 
-        // Provisional field mapping — see UniformSchema.cs and docs/ebx-uniform-mapping.md. These
-        // names are an unverified baseline ported from the Madden 19/20 SDK profiles; they may not
-        // match CFB27's real ebx field names until validated against an actual dump.
+        // Confirmed field mapping — see UniformSchema.cs and docs/ebx-uniform-mapping.md. Read
+        // directly from the real COLLEGEFOOTBALL27SDK.dll's IL metadata (not a guess ported from
+        // another game). e.Item.Name matches by simple property name regardless of how deep the
+        // edited field sits in the CharacterUniformJerseyItem/HelmetItem object graph.
         private void PgAsset_OnModified(object sender, ItemModifiedEventArgs e)
         {
             switch (e.Item.Name)
             {
-                case UniformSchema.JerseyName:
-                case UniformSchema.JerseyNumber:
-                case UniformSchema.JerseyType:
-                case UniformSchema.JerseySleeve:
-                case UniformSchema.MixMatchJerseyData:
+                case UniformSchema.JerseyColorMap:
+                case UniformSchema.JerseyMaterialMap:
+                case UniformSchema.JerseyNormalMap:
+                case UniformSchema.JerseyNumbersArrayMap:
+                case UniformSchema.NumberTexture:
+                case UniformSchema.NameplateTexture:
+                case UniformSchema.NumberWidthAdjustmentList:
                     screen.SetJerseyField(e.Item.Name, e.NewValue);
                     break;
 
-                case UniformSchema.HelmetPreset:
-                case UniformSchema.PlayerHelmet:
-                case UniformSchema.MixMatchHelmetData:
+                case UniformSchema.HelmetColorMap:
+                case UniformSchema.ShellMaterialMap:
+                case UniformSchema.AccessoryMaterialMap:
+                case UniformSchema.FacemaskMaterial:
+                case UniformSchema.ShellSmoothness:
+                case UniformSchema.ShellReflectance:
+                case UniformSchema.ShellSparkleReflectance:
+                case UniformSchema.CoatSmoothness:
+                case UniformSchema.CoatReflectance:
+                case UniformSchema.MetalFlakeStrength:
                     screen.SetHelmetField(e.Item.Name, e.NewValue);
                     break;
 
-                case UniformSchema.UniformPrimaryColor:
-                case UniformSchema.UniformSecondaryColor:
+                case UniformSchema.FacemaskCustomColor1:
+                case UniformSchema.FacemaskCustomColor2:
+                case UniformSchema.FacemaskCustomColor3:
+                case UniformSchema.FacemaskCustomColor4:
+                case UniformSchema.ChinstrapColor:
+                case UniformSchema.TeamColorsPrimary:
+                case UniformSchema.TeamColorsSecondary:
+                case UniformSchema.PrimaryColor:
+                case UniformSchema.SecondaryColor:
                     screen.SetColorField(e.Item.Name, e.NewValue);
                     break;
             }

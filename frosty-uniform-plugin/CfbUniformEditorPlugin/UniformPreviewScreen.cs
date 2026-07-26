@@ -37,17 +37,30 @@ namespace CfbUniformEditorPlugin
 
         public void SetColorField(string fieldName, object value)
         {
-            // Frostbite ebx vector/color structs commonly expose lowercase x/y/z/w members (see
-            // ObjectVariationPlugin's shader-param handling in the FrostyToolsuite submodule for
-            // precedent) — try that shape as our best guess for UniformPrimaryColor/SecondaryColor.
+            // Two confirmed shapes in the real CFB27 SDK (see docs/ebx-uniform-mapping.md):
+            // NFLTeamAsset.PrimaryColor/SecondaryColor and ChinstrapColor/FacemaskCustomColorN are
+            // Vec3/Vec4 (lowercase x/y/z), but TeamColors.Primary/Secondary is ColorRgb
+            // (capitalized R/G/B). Try both rather than guessing one.
             try
             {
                 dynamic c = value;
                 swatchColor = new Color4((float)c.x, (float)c.y, (float)c.z, 1.0f);
+                return;
             }
             catch
             {
-                App.Logger.LogWarning($"Uniform preview: couldn't read '{fieldName}' as a color yet — CFB27's real field shape isn't confirmed (see docs/ebx-uniform-mapping.md)");
+                // not a Vec3/Vec4 shape — fall through and try ColorRgb below
+            }
+
+            try
+            {
+                dynamic c = value;
+                swatchColor = new Color4((float)c.R, (float)c.G, (float)c.B, 1.0f);
+                return;
+            }
+            catch
+            {
+                App.Logger.LogWarning($"Uniform preview: couldn't read '{fieldName}' as a color — neither the Vec3/Vec4 (x/y/z) nor ColorRgb (R/G/B) shape matched (see docs/ebx-uniform-mapping.md)");
             }
         }
     }
