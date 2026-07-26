@@ -1,0 +1,35 @@
+
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.5.33318.248
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FrostyEditor", "FrostyToolsuite\FrostyEditor\FrostyEditor.csproj", "{355B078B-45A5-472D-9CCD-688D8E30BAED}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CfbUniformEditorPlugin", "CfbUniformEditorPlugin\CfbUniformEditorPlugin.csproj", "{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Developer - Debug|x64 = Developer - Debug|x64
+		Release - Alpha|x64 = Release - Alpha|x64
+		Release - Beta|x64 = Release - Beta|x64
+		Release - Final|x64 = Release - Final|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Developer - Debug|x64.ActiveCfg = Developer - Debug|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Developer - Debug|x64.Build.0 = Developer - Debug|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Alpha|x64.ActiveCfg = Release - Alpha|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Alpha|x64.Build.0 = Release - Alpha|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Beta|x64.ActiveCfg = Release - Beta|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Beta|x64.Build.0 = Release - Beta|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Final|x64.ActiveCfg = Release - Final|x64
+		{355B078B-45A5-472D-9CCD-688D8E30BAED}.Release - Final|x64.Build.0 = Release - Final|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Developer - Debug|x64.ActiveCfg = Developer - Debug|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Developer - Debug|x64.Build.0 = Developer - Debug|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Alpha|x64.ActiveCfg = Release - Alpha|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Alpha|x64.Build.0 = Release - Alpha|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Beta|x64.ActiveCfg = Release - Beta|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Beta|x64.Build.0 = Release - Beta|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Final|x64.ActiveCfg = Release - Final|x64
+		{8DD6FADE-AC72-4108-BA14-FAA3C8DD1BD2}.Release - Final|x64.Build.0 = Release - Final|x64
+	EndGlobalSection
+EndGlobal
