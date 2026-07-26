@@ -1,0 +1,52 @@
+{
+  "manifest_version": 3,
+  "name": "EA JSON Editor Team Builder Helper",
+  "version": "0.6.0",
+  "description": "Captures and mocks EA Team Builder nonce-primary JSON payloads for the JSON Editor, and includes a bundled schema-aware editor accessible from the toolbar icon.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAy52qybygldl7cN8uvdukjDOaZx9E0Z5hivrQ49AfOpwzXcBSE/5wFx5GXN7kb5+jTPMBBgEVl6MIIk9pJ68ADE1QOAE4VawSbifTJ8NM/XnL+tK3kJU+tZwlrj5UY+Smhmq1XQLhtsoKW+z7FlaX0a8wqOBOxa6citwJu00nrApBi+MP5mKNjjKgMQnzN7VD6TTOZGR8OESi0oy2ixOFgAlXZfcqoFI3g5prw3UfvqTpvvf55pIZlvcFSColgDeSI/Y4kx41SMKgGGItQayGTnwVmaayb77Kt3H63Ntz1hHYRJDlWKlAEub+JceYE/s6zQDcgKdvmuiBURWCAx7A1QIDAQAB",
+  "permissions": [
+    "storage",
+    "unlimitedStorage",
+    "debugger",
+    "tabs"
+  ],
+  "host_permissions": [
+    "https://www.ea.com/*",
+    "https://cdn.mcr.ea.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Open Team Builder schema editor"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.ea.com/games/ea-sports-college-football/team-builder/*",
+        "https://www.ea.com/games/madden-nfl/team-builder/*"
+      ],
+      "js": [
+        "bridge.js"
+      ],
+      "run_at": "document_start"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "capture.js"
+      ],
+      "matches": [
+        "https://www.ea.com/*"
+      ]
+    }
+  ],
+  "externally_connectable": {
+    "matches": [
+      "https://json-editor-8e455.web.app/*",
+      "http://127.0.0.1:*/*",
+      "http://localhost:*/*"
+    ]
+  }
+}
