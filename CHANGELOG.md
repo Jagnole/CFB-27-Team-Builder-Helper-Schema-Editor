@@ -4,6 +4,13 @@ Version number shown in the editor's header and in the activity log on load.
 Bump `EDITOR_VERSION` in `editor.js` with each round of changes, and log what
 changed here.
 
+## v0.04
+- Added three new jersey number font catalog entries, sourced from real
+  `JerseyPartItem` ebx XML dumps: **Notre Dame Shamrock 2026**, **Wisconsin
+  Shamrock 2026**, and **Northwestern Purple Gothic**. Each also carries a
+  `spacing` value read from the XML's `numberspacing.x` — captured for now,
+  not yet wired to anything the picker writes (see note in the PR/commit).
+
 ## v0.03
 - Added a **live preview** above the field pickers: a simple 2D stand-in figure
   (helmet + jersey outline) that updates as you pick a helmet shell material or
