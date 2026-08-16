@@ -52,11 +52,10 @@ runs at the browser layer, where it can.
 
 ## Installation
 
-1. Download the [team-builder-helper-extension-v0_75.zip] file
+1. Download the ('team-builder-helper-extension-v0_75.zip') file
 2. Drag and drop it into the chrome extension tab
 3. That's it!
 
-That's it — no build step, no dependencies to install.
 
 ## Usage
 
