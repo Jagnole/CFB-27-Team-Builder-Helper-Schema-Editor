@@ -10,30 +10,12 @@ locally captured data in your own browser and does not touch EA's servers.**
 
 ## Why this exists
 
-We need more fonts so dammit, here's every single one in the game.
-Also do you want that perfect Matte finish that Okloahoma State uses on their helmets? Well you can get that too!
-
 Team Builder's JSON payload is the only place that actually controls a team's
 number fonts, name fonts, and helmet materials — but there's no in-game UI for
 most of it, and the raw structure is a maze of nested, inconsistently-named
 fields. Browsers also isolate `ea.com` network traffic from any other site, so
 a plain website can't intercept and edit that data on its own. This extension
 runs at the browser layer, where it can.
-
-## What this won't do
-
-It will not change the colors of the helmet, or numbers, those are decided on the TB website.
-It will not change the spacing of the numbers, that is controlled on the website at this time, you can adjust it on the website
-Not everything will work with each other, a good example is using a ND shell with any color other than Gold or Grey (silver)
-
-## What to expect
-
-You can now pick whichever font and helmet texture you want!!!
-Bugs, there is pre-pre alpha build so keep in mind there may not be some items working
-You can always override things on the website to return things to normal if needed
-
-*Important note: If you pick a font that uses 3 colors, start off by picking a default font on the TB website that has three colors so that they can actually be pulled!*
-
 
 ## Features
 
@@ -42,10 +24,35 @@ You can always override things on the website to return things to normal if need
   Confirmed working: writes both fields the game actually reads.
 - **Helmet materials** — pick a shell finish by school/year/color and the
   matching accessory material gets set automatically.
+- **Vendor Decal picker + gallery** — swap jersey/pants/socks decal brand and
+  material (Nike, Adidas, Jumpman, Under Armour, New Balance) in one click.
+  Gallery view shows a live color preview of each decal, not just a name.
+- **Decal Tint** — apply this team's real colors, or a custom palette you set
+  yourself, into the vendor decal's tint fields across jersey, pants, and
+  socks at once. One shared palette, not per-piece — Apply All always writes
+  the same colors everywhere.
+- **Team Colors reference** — a static, always-accurate readout of this
+  payload's real school colors, for reference while working anywhere else in
+  the tool.
+- **Number Color** — tint jersey numbers per channel. Channel counts for 193
+  fonts are grounded in real data (a batch analysis of 257 teams' actual
+  exports), not guessed per font.
+- **Number Spacing** — adjust horizontal kerning between digits, with a
+  Reset back to whatever value the font started at.
+- **Mask & Stripe Studio** — a separate tab for compositing an uploaded
+  texture onto collar/chest decal masks or helmet stripe patterns, with
+  per-region color/texture assignment. Exports a PNG for manual upload
+  through Team Builder's own custom texture tool — doesn't touch the JSON
+  payload at all.
 - **Reset to loaded** — revert every edit back to exactly what was fetched,
   with one click.
 - Runs entirely locally. Nothing is sent anywhere except EA's own servers
   (to fetch the team you already have open) and back to your own browser.
+
+## Screenshots
+
+*(Add a screenshot of the editor panel here — Connection / Payload / Structured
+fields / Push back.)*
 
 ## Installation
 
@@ -88,6 +95,19 @@ unreliable, or that were never confirmed, were deliberately left out rather
 than shipped half-working — see `CHANGELOG.md` for the specifics of what
 changed and why.
 
+A couple of features have been built, tested, found not to work as intended,
+and deliberately pulled back out rather than left half-broken in the UI —
+the code is intact and documented for when they're picked back up:
+
+- **Number Size** — a slider for jersey number scale existed briefly but was
+  found to move numbers in the wrong direction on a real in-game check.
+  Removed from the UI; see the comment above `renderSizeSection` in
+  `editor.js` for exactly what's known and what's still unresolved.
+- **Conference Logo Tint** — built and structurally identical to the
+  confirmed-working Vendor Decal Tint, but every available way to test it
+  against a real conference-assigned team hit a dead end. Parked rather than
+  shipped as if proven.
+
 ## Project structure
 
 ```
@@ -97,7 +117,14 @@ background.js     Service worker — captures Team Builder's data requests
 bridge.js         Runs on ea.com pages, relays request info to background.js
 capture.js        Injected into the page to patch fetch/XHR for URL capture
 editor.html       The bundled schema editor page (opened from the toolbar)
-editor.js         Editor logic, including the built-in font/material catalog
+editor.js         Editor logic, including the built-in font/material/decal
+                  catalog and Decal Tint / Number Color logic
+mask-studio.js    Mask & Stripe Studio tab — texture compositing, no
+                  connection to the JSON payload editor above it
+toptabs.js        Switches between the JSON Editor and Mask & Stripe Studio
+                  tabs (kept as an external file — extension pages block
+                  inline <script> tags by default)
+masks/            Bundled mask images used by Mask & Stripe Studio
 CHANGELOG.md      Version history for the editor
 ```
 
@@ -119,6 +146,12 @@ changed in the editor.
 
 ## Credits
 
-Built by Tyler (Jagnole) with development assistance from Claude
-(Anthropic). Font and material catalog data compiled by hand from
-in-game asset references.
+Built by Tyler ([Jagnole](https://github.com/Jagnole)) with development
+assistance from Claude (Anthropic). Font, material, and decal catalog data
+compiled by hand from in-game asset references and real exported XML/DDS
+data — not guessed from averages.
+
+## License
+
+*(Choose one — MIT is a common default for small tools like this if you want
+others to be able to freely use and modify it.)*
