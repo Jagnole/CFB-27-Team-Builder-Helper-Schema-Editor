@@ -49,21 +49,12 @@ runs at the browser layer, where it can.
 - Runs entirely locally. Nothing is sent anywhere except EA's own servers
   (to fetch the team you already have open) and back to your own browser.
 
-## Screenshots
-
-*(Add a screenshot of the editor panel here — Connection / Payload / Structured
-fields / Push back.)*
 
 ## Installation
 
-1. Download this repository as a ZIP (**Code → Download ZIP**) and unzip it
-   somewhere permanent — not your Downloads folder, since Chrome needs to keep
-   reading from that location.
-2. Open Chrome and go to `chrome://extensions`.
-3. Turn on **Developer mode** (top-right toggle).
-4. Click **Load unpacked**, then select the unzipped folder.
-5. Click the puzzle-piece icon in Chrome's toolbar and pin this extension so
-   its icon stays visible.
+1. Download the [team-builder-helper-extension-v0_75.zip] file
+2. Drag and drop it into the chrome extension tab
+3. That's it!
 
 That's it — no build step, no dependencies to install.
 
