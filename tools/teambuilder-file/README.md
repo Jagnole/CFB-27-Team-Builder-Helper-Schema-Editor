@@ -117,7 +117,11 @@ resolution and the file stays exactly its original size.
    render, which proves the container and the tree. An early version wrote
    the uniform's designs but not the team's uniform list, so the extra
    uniform never appeared; the list is written now (see `FORMAT.md` §3).
-   Whether an imported design renders exactly as the creator previews it is
-   still unconfirmed. Keep a copy of the original save file.
+   An imported uniform then rendered, but wrong: decals had been placed by
+   number into stripe slots and tiled across the whole jersey. Placement is
+   by layer purpose now. What is still unconfirmed is whether the export's
+   flattened base maps belong on the base layer — they carry the design's
+   colours, stripes and wordmarks, which nothing else in the export does, so
+   the importer writes them by default. Keep a copy of the original save.
 2. **Mind the 7.5 MiB budget** — see *Space* above. `--grow` is there to
    test the limit, not to rely on.

@@ -188,6 +188,38 @@ and `#2f3bcf` switched from 254 to the slot id.
 | `#703b9a`, `#72d9ba` | two print blocks (numbers / nameplate), each `{font, flags, 6 print layers, 2 more}` |
 | `#f4dc9a`, `#f4dcba` | further piece settings (facemask, sock colours and similar live somewhere in here — not yet pinned down) |
 
+### The overlay slots are fixed-purpose
+
+The 20 overlays are not a free stack. Each index has a job, and which job
+sits at which index depends on the uniform's preset. A jersey looks like
+this:
+
+| index | what it is |
+|-------|------------|
+| 0 | `Seams` — the base layer, drawn across the whole UV (scale `0,0`) |
+| 1–6 | stripe slots: `TEAMBUILDER_Jersey_2024_Stripes_UpperBody02`, `…_Sleeves02`, `…_SleeveCuffs01`, `…_Collar01` |
+| 7–15 | user decals. On a uniform edited in Team Builder these are labelled `Custom Layer 1`, `Custom Layer 2`; on an untouched team the EA placeholder logo sits in them; on a blank team they are empty |
+| 16 | `TShirtandPads` |
+| 17 | the vendor patch — `#f4cbce` = `…/uniforms/nike_patch_slot` |
+| 18 | the conference patch — `#f4cbce` = `…/comp_slots/independent_conference_logo_slot` |
+| 19 | the bowl patch — `#f4cbce` = `…/uniforms/bowl_patch_slot` |
+
+The three patch slots name their own config path in `#f4cbce`, which makes
+them findable without counting. Everything else has to be recognised by its
+label or by the asset it currently holds.
+
+**A kit numbers its layers by its own uniform's nodes**, so `overlay_3` in an
+export is not index 3 here — in the Boise export it is the vendor logo, while
+index 3 in the target is a shoulder-stripe slot. Importing by index put
+decals into stripe slots, where they tiled across the whole jersey. Layers
+have to be placed by what they are: the asset path says which
+(`/decals/vendors/`, `/decals/conferences/`, `/decals/teams/`, `bowl`), and
+the target slot is then found by config path, label, or current asset.
+
+The piece's CID mask slots are a separate array, `#2d998e`, whose first entry
+holds the seams mask (`NIKE_Jersey_2023_Seams_VaporUntouchable_02_cid`) —
+that is what a kit's `cidMasks[].link` sets.
+
 ### One layer (overlay or material)
 
 | field | sub-field | meaning |
@@ -200,7 +232,7 @@ and `#2f3bcf` switched from 254 to the slot id.
 | `#ad29d3` | `#6c38ce` | scale `{#f30bd7 U, #f30bdb V}` |
 | | `#b369be` | offset `{U, V}` |
 | | `#21fdca` | rotation in **degrees** (180 and 5 observed) |
-| | `#76cd8e` | clamp `{U, V}` — only ever `1,1` or `0,0`, so a bool (INFERRED: the creator's `clampUv`) |
+| | `#76cd8e` | clamp `{#f858da x, #f958da y}` — note x/y here, not the u/v the scale and offset structs use — only ever `1,1` or `0,0`, so a bool |
 | | `#ae4ccf` | packed mirror `{#f758da offsetV, #f858da scaleU, #f958da scaleV, #fa58da offsetU}` — kept in step with the fields above |
 | `#a4cb8a` | `#22fb8e`, `#a2fcba`, `#e238be`, `#624bca` | four blend weights (INFERRED as colour, normal, rsm, occlusion in that order) plus `#e4db8a` mode |
 | `#338dd3` | `#32fb8e` | colour texture |
