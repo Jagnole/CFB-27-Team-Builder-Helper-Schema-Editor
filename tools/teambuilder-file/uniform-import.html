@@ -27,6 +27,8 @@
        margin: 0 0 12px; }
   label { display: block; font-weight: 600; margin: 12px 0 4px; }
   label:first-of-type { margin-top: 0; }
+  label.check { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  label.check input { margin: 0; }
   input[type=file] { width: 100%; }
   input[type=text], input[type=number], select {
     width: 100%; max-width: 320px; padding: 7px 9px; border: 1px solid var(--line);
@@ -68,7 +70,7 @@
 <main>
   <div id="banner">Starting up… if this message stays, the files this page needs
   (<code>tbfile.js</code>, <code>uniform.js</code>, <code>kitzip.js</code>,
-  <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
+  <code>imaging-web.js</code>, <code>textures.js</code>, <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
   page — download the whole <code>tools/teambuilder-file/</code> folder, or use
   <code>uniform-import-standalone.html</code>, which has everything in one file.</div>
   <h1>Team Builder Uniform Importer</h1>
@@ -105,16 +107,29 @@
       <div>
         <label for="texMode">Baked textures</label>
         <select id="texMode">
-          <option value="fit">Shrink to fit the save file</option>
+          <option value="fit">Fit them into the space there is</option>
           <option value="asis">Embed at full size</option>
           <option value="skip">Skip — recipe only</option>
         </select>
-        <div class="hint">A save file has a fixed size, so large images may not fit.</div>
+        <div class="hint">The biggest image is shrunk first, so detail stays where it counts.
+        A flat image is stored as a 4×4.</div>
       </div>
       <div>
-        <label for="maxDim">Shrink limit (px)</label>
-        <input type="number" id="maxDim" value="1024" min="128" max="4096" step="128">
-        <div class="hint">Longest edge when shrinking.</div>
+        <label for="maxDim">Starting size (px)</label>
+        <input type="number" id="maxDim" value="2048" min="128" max="4096" step="128">
+        <div class="hint">Longest edge before any fitting.</div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label class="check"><input type="checkbox" id="prune"> Reclaim unused images</label>
+        <div class="hint" id="pruneHint">Drops uploaded images no layer points at any more.</div>
+      </div>
+      <div>
+        <label class="check"><input type="checkbox" id="grow"> Write a bigger file (experimental)</label>
+        <div class="hint">A save file is exactly 7.5 MiB, which looks like a deliberate limit.
+        This rewrites the size fields in the header to make a larger one — it may simply be
+        rejected. Untested.</div>
       </div>
     </div>
   </section>
@@ -138,6 +153,8 @@
 <script src="tbfile.js"></script>
 <script src="uniform.js"></script>
 <script src="kitzip.js"></script>
+<script src="imaging-web.js"></script>
+<script src="textures.js"></script>
 <script src="uniform-import.js"></script>
 </body>
 </html>

@@ -226,9 +226,28 @@
 
   // --------------------------------------------------------------- container
   const MAGIC = 'FBCHUNKS';
-  /* Offset 12 of the header block holds the size of the data region that
-     follows it, so the payload starts at fileSize - that value. */
-  const REGION_SIZE_OFFSET = 12;
+  /*
+   * 18-byte preamble, then two regions that together are exactly 7.5 MiB:
+   *   @0  "FBCHUNKS"
+   *   @8  uint16  version (1)
+   *   @10 uint32  header region size   (17,932 in the sample)
+   *   @14 uint32  data region size     (7,846,388 — where the zlib stream is)
+   * and the data region size appears a second time at @62. Nothing records
+   * how much of the data region is actually used, so the region size is the
+   * ceiling: 18 + 17,932 + 7,846,388 = 7,864,338 = 7.5 MiB + the preamble.
+   */
+  const PREAMBLE = 18;
+  const HEADER_SIZE_OFFSET = 10;
+  const REGION_SIZE_OFFSET = 14;
+  const REGION_SIZE_COPY_OFFSET = 62;
+
+  function readU32(b, o) {
+    return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16)) + b[o + 3] * 0x1000000;
+  }
+  function writeU32(b, o, v) {
+    b[o] = v & 0xff; b[o + 1] = (v >>> 8) & 0xff; b[o + 2] = (v >>> 16) & 0xff;
+    b[o + 3] = Math.floor(v / 0x1000000) & 0xff;
+  }
 
   function isZlibHeader(bytes, i) {
     return i + 1 < bytes.length && bytes[i] === 0x78 &&
@@ -236,10 +255,10 @@
   }
 
   function findStream(bytes) {
-    const region = bytes[REGION_SIZE_OFFSET] | (bytes[REGION_SIZE_OFFSET + 1] << 8) |
-      (bytes[REGION_SIZE_OFFSET + 2] << 16) | (bytes[REGION_SIZE_OFFSET + 3] * 0x1000000);
-    const stated = bytes.length - region;
-    if (region > 0 && stated > 8 && isZlibHeader(bytes, stated)) return stated;
+    const stated = PREAMBLE + readU32(bytes, HEADER_SIZE_OFFSET);
+    if (stated > PREAMBLE && stated < bytes.length && isZlibHeader(bytes, stated)) return stated;
+    const fromRegion = bytes.length - readU32(bytes, REGION_SIZE_OFFSET);
+    if (fromRegion > PREAMBLE && fromRegion < bytes.length && isZlibHeader(bytes, fromRegion)) return fromRegion;
     for (let i = 8; i < bytes.length - 1; i++) if (isZlibHeader(bytes, i)) return i;
     return -1;
   }
@@ -290,20 +309,49 @@
     }
     /** Free space left in the container for a bigger compressed payload. */
     get freeSpace() { return this.totalSize - this.streamOffset - this.originalCompressedSize; }
+    /** Does the header declare its data region the way grow() expects? */
+    get regionFieldsMatch() {
+      const region = this.totalSize - this.streamOffset;
+      return readU32(this.header, REGION_SIZE_OFFSET) === region &&
+        readU32(this.header, REGION_SIZE_COPY_OFFSET) === region;
+    }
+
     /**
      * Rebuild the whole file around a new payload, keeping the header and the
-     * fixed total file size. Throws if the compressed payload no longer fits.
+     * fixed total file size.
+     *
+     * @param opts {{grow?:boolean, growAlign?:number}}
+     *   grow writes a LARGER data region and updates the two size fields in
+     *   the header to match. The sample file is exactly 7.5 MiB, which looks
+     *   like a deliberate save budget rather than a quirk of the format, so
+     *   whether Team Builder or the game accepts a bigger file is UNKNOWN.
+     *   Off by default for that reason.
      */
-    async build(payload, zlib) {
+    async build(payload, zlib, opts) {
+      opts = opts || {};
       const comp = normalizeZlibHeader(await zlib.deflate(payload));
       const used = this.streamOffset + comp.length;
-      if (used > this.totalSize) {
+      if (used <= this.totalSize) {
+        const out = new Uint8Array(this.totalSize);
+        out.set(this.header, 0);
+        out.set(comp, this.streamOffset);
+        return out;
+      }
+      if (!opts.grow) {
         throw new Error('payload too large for this save file: needs ' + used +
           ' bytes, container holds ' + this.totalSize +
           ' (over by ' + (used - this.totalSize) + ' bytes)');
       }
-      const out = new Uint8Array(this.totalSize);
+      if (!this.regionFieldsMatch) {
+        throw new Error('cannot grow this file: its header does not declare the data ' +
+          'region the way this tool understands, so the size fields cannot be updated safely');
+      }
+      const align = opts.growAlign || 0x10000;          // keep some slack, like the original
+      const region = Math.ceil((comp.length + 1) / align) * align;
+      const out = new Uint8Array(this.streamOffset + region);
       out.set(this.header, 0);
+      writeU32(out, REGION_SIZE_OFFSET, region);
+      writeU32(out, REGION_SIZE_COPY_OFFSET, region);
       out.set(comp, this.streamOffset);
       return out;
     }
@@ -339,7 +387,7 @@
   return {
     T, Reader, Writer, Container,
     parsePayload, buildPayload, readValue, writeValue, cloneNode, typeOf,
-    findStream, normalizeZlibHeader,
+    findStream, normalizeZlibHeader, PREAMBLE,
     field, setField, mapGet, mapSet, walk,
     zlibNode, zlibWeb, autoZlib,
   };

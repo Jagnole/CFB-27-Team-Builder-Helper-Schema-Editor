@@ -6,8 +6,15 @@
  *   node cli.js roundtrip  TEAMBUILDER-003
  *   node cli.js uniforms   TEAMBUILDER-003
  *   node cli.js clone      TEAMBUILDER-003 --from HOME --name Alt1 -o OUT
+ *   node cli.js prune      TEAMBUILDER-003 [--apply] [-o OUT]
  *   node cli.js import     TEAMBUILDER-003 kit.zip [--name Alt1] [--from HOME]
- *                          [--max-texture-bytes N] [--skip-baked] [-o OUT]
+ *                          [--prune] [--max-dim 2048] [--keep-flat]
+ *                          [--skip-baked] [--grow] [-o OUT]
+ *
+ * Space: a save file is a fixed 7.5 MiB. --prune reclaims images nothing
+ * points at, baked images are shrunk biggest-first to fit, and flat ones are
+ * dropped. --grow writes a bigger file by rewriting the header's size fields,
+ * which is UNTESTED against the game.
  */
 'use strict';
 const fs = require('fs');
@@ -15,8 +22,12 @@ const zlib = require('zlib');
 const TB = require('./tbfile.js');
 const U = require('./uniform.js');
 const KZ = require('./kitzip.js');
+const PNG = require('./png.js');
+const TX = require('./textures.js');
 
 const z = TB.zlibNode(zlib);
+const imaging = PNG.imaging(PNG.nodeZlib(zlib));
+const kb = (n) => (n / 1024).toFixed(0) + ' KB';
 
 function parseArgs(argv) {
   const out = { _: [] };
@@ -38,13 +49,18 @@ async function open(path) {
   return { raw, container, recs: TB.parsePayload(container.payload) };
 }
 
-async function save(container, recs, path) {
+async function save(container, recs, path, opts) {
+  opts = opts || {};
   const payload = TB.buildPayload(recs);
-  const file = await container.build(payload, z);
+  const file = await container.build(payload, z, opts);
   fs.writeFileSync(path, file);
   const comp = container.compressedLengthOf(file.subarray(container.streamOffset));
-  console.log('wrote ' + path + ' (' + file.length + ' bytes, ' + comp +
-    ' compressed, ' + (container.totalSize - container.streamOffset - comp) + ' bytes spare)');
+  const grew = file.length !== container.totalSize;
+  console.log('wrote ' + path + ' (' + file.length + ' bytes, ' + comp + ' compressed, ' +
+    (file.length - container.streamOffset - comp) + ' bytes spare)' +
+    (grew ? '\n  NOTE: this file is larger than the original ' + container.totalSize +
+      ' bytes. The original size is exactly 7.5 MiB, which looks like a deliberate' +
+      '\n        save budget, so a grown file may be rejected. Untested — try it and keep the original.' : ''));
 }
 
 const CMDS = {
@@ -59,6 +75,32 @@ const CMDS = {
     console.log('team code      ' + loc.teamCode);
     console.log('uniforms       ' + U.listVariants(loc).join(', '));
     console.log('custom images  ' + (loc.textureMap ? loc.textureMap.entries.length : 0));
+    const unused = TX.unusedTextures(recs, loc);
+    const prunable = unused.filter((u) => u.prunable);
+    if (prunable.length) {
+      const total = prunable.reduce((a, u) => a + u.bytes, 0);
+      console.log('unreferenced   ' + prunable.length + ' image(s), ' + kb(total) +
+        ' reclaimable with --prune');
+      for (const u of prunable) console.log('   - ' + u.key + '  ' + kb(u.bytes));
+    }
+  },
+
+  async prune([path], args) {
+    const { container, recs } = await open(path);
+    const loc = U.locate(recs);
+    const unused = TX.unusedTextures(recs, loc);
+    for (const u of unused) {
+      console.log((u.prunable ? 'prunable ' : 'kept     ') + u.key.padEnd(34) +
+        kb(u.bytes).padStart(9) + '  ' + u.reason);
+    }
+    const keys = unused.filter((u) => u.prunable).map((u) => u.key);
+    if (!keys.length) return console.log('nothing to reclaim');
+    if (!args.apply) {
+      return console.log('\n' + keys.length + ' image(s) would be removed — add --apply to write the file');
+    }
+    const result = TX.pruneTextures(loc, keys);
+    console.log('\nremoved ' + result.removed + ' image(s), ' + kb(result.bytes) + ' of image data');
+    await save(container, recs, args.out || path.replace(/(\.[^./]*)?$/, '') + '-pruned', { grow: !!args.grow });
   },
 
   async roundtrip([path]) {
@@ -101,9 +143,42 @@ const CMDS = {
 
   async import([path, kitPath], args) {
     const { container, recs } = await open(path);
-    const kit = await KZ.readKit(new Uint8Array(fs.readFileSync(kitPath)), KZ.inflateRawNode(zlib));
+    const loc = U.locate(recs);
+    let kit = await KZ.readKit(new Uint8Array(fs.readFileSync(kitPath)), KZ.inflateRawNode(zlib));
     console.log('kit "' + (kit.json.uniformName || '?') + '" for ' + (kit.json.team || '?') +
       ' (schema v' + kit.json.schemaVersion + ', ' + kit.files.size + ' files)');
+
+    // reclaim space from images nothing points at any more
+    let reclaimed = 0;
+    if (args.prune) {
+      const keys = TX.unusedTextures(recs, loc).filter((u) => u.prunable).map((u) => u.key);
+      const result = TX.pruneTextures(loc, keys);
+      reclaimed = result.bytes;
+      console.log('reclaimed      ' + result.removed + ' unreferenced image(s), ' + kb(reclaimed));
+    }
+
+    // make the export's baked images fit the space there is
+    const margin = 64 * 1024;
+    const budget = args.grow ? Infinity
+      : Math.max(0, container.freeSpace + reclaimed - margin);
+    if (!args['skip-baked']) {
+      const plan = await TX.planKitTextures(kit, {
+        budget,
+        maxDim: args['max-dim'] ? Number(args['max-dim']) : 2048,
+        skipFlat: !args['keep-flat'],
+        imaging,
+      });
+      kit = plan.kit;
+      console.log('images         ' + kb(plan.totalBytes) + ' after planning' +
+        (budget === Infinity ? '' : ' (budget ' + kb(budget) + ')') +
+        (plan.fits ? '' : ' — STILL TOO BIG'));
+      for (const d of plan.decisions) {
+        const mark = { flatten: '.', shrink: '~', keep: '=' }[d.action] || '=';
+        console.log('   ' + mark + ' ' +
+          d.file.padEnd(28) + kb(d.bytes).padStart(9) + '  ' + d.reason);
+      }
+    }
+
     const report = U.importKit(recs, kit, {
       name: args.name ? U.sanitizeVariant(args.name) : undefined,
       source: args.from,
@@ -115,7 +190,7 @@ const CMDS = {
     for (const line of report.applied) console.log('   + ' + line);
     if (report.textures.length) {
       console.log('images added   ' + report.textures.length);
-      for (const t of report.textures) console.log('   * ' + t.file + ' -> ' + t.key + ' (' + t.bytes + ' bytes)');
+      for (const t of report.textures) console.log('   * ' + t.file + ' -> ' + t.key + ' (' + kb(t.bytes) + ')');
     }
     if (report.skipped.length) {
       console.log('skipped        ' + report.skipped.length);
@@ -125,7 +200,8 @@ const CMDS = {
       console.log('not imported   (no confirmed field mapping yet)');
       for (const line of report.unmapped) console.log('   ? ' + line);
     }
-    await save(container, recs, args.out || path.replace(/(\.[^./]*)?$/, '') + '-' + report.variant);
+    await save(container, recs, args.out || path.replace(/(\.[^./]*)?$/, '') + '-' + report.variant,
+      { grow: !!args.grow });
   },
 };
 

@@ -13,26 +13,42 @@ so. Nothing below has been confirmed *in game* — see "Untested" at the end.
 ## 1. Container
 
 ```
-offset 0          "FBCHUNKS"
-offset 12         uint32 LE  size of the data region that follows the header
-...               fixed-size header block: team name, nickname, abbreviation,
-                  team code, an ISO timestamp, and small JSON blobs
-                  (pipelineInfluences, teamBuilderRecords, topPlayerInfos,
-                  rivalries) in fixed-width fields
-headerSize        one zlib stream (0x78 0xDA) holding the whole team
-                  headerSize = fileSize - uint32@12   (17,950 in the sample)
-end of stream     0x00 padding to the end of the file
+@0    "FBCHUNKS"
+@8    uint16  version (1)
+@10   uint32  header region size   17,932
+@14   uint32  data region size     7,846,388   (a second copy sits at @62)
+@18   the header region: team name, nickname, abbreviation, team code, an ISO
+      timestamp, and small JSON blobs (pipelineInfluences, teamBuilderRecords,
+      topPlayerInfos, rivalries) at fixed offsets. 14,069 bytes were in use in
+      the sample, so about 3.8 KB of it is slack.
+@17950 the data region: one zlib stream (0x78 0xDA) holding the whole team,
+      then 0x00 padding to the end of the file.
 ```
 
-The total file size is fixed, so **a save file has a hard space budget**: in
-the sample, 7,846,388 bytes for the compressed payload, of which 5,556,899
-were used — about 2.2 MB spare. Writing more than that cannot be done
-without changing the file size, which the tool refuses to do.
+The two region sizes add up exactly: `18 + 17,932 + 7,846,388 = 7,864,338`,
+and `17,932 + 7,846,388 = 7,864,320` — **precisely 7.5 MiB**. A round number
+that exact is a budget somebody chose, not a coincidence of the format.
 
-The zero padding matters when reading: `DecompressionStream` in the browser
-rejects trailing bytes, so the stream has to be cut at its true end (the
-last non-zero byte, plus up to four bytes in case the stream's own Adler-32
-checksum ends in zeros).
+**Nothing in the file records how much of the data region is used.** The
+reader must inflate until the stream ends, which is why the region is
+zero-padded. So the practical ceiling on a save is the data region size:
+5,556,899 of 7,846,388 bytes were used in the sample, leaving about 2.2 MB.
+
+Two consequences:
+
+- The size fields are in the header, so a **larger** file can be written by
+  raising them (`--grow`, or the checkbox on the page). Whether Team Builder
+  or the game accepts one is **untested** — given the exact 7.5 MiB, a cap on
+  their side is the likely explanation, and the only way to find out is to
+  try it.
+- Trailing padding matters when reading: `DecompressionStream` in the browser
+  rejects trailing bytes, so the stream has to be cut at its true end (the
+  last non-zero byte, plus up to four bytes in case the stream's own Adler-32
+  checksum ends in zeros).
+
+Uploaded images dominate the payload — 5.42 MB of the sample's 6.83 MB,
+79% — so they are where space is won or lost. In the sample, 1.27 MB of them
+were referenced by nothing at all (see §3).
 
 ## 2. Payload: a tagged tree
 
@@ -112,6 +128,14 @@ Custom image entry (`#345ed2` values):
 |-------|---------|
 | `#74488a` | blob: the PNG bytes as uploaded |
 | `#78498f` | string: its `cdn.mcr.ea.com` URL, or empty for an image added locally |
+
+An image is referenced by its table key appearing as a layer's texture link,
+and team-wide art (`RCVVF_char_logosheet_color`, `RCVVF_ez_bowl`) by a longer
+asset path that contains the key. An image with no reference of either kind
+is dead weight; the sample had three, totalling 1.27 MB, one of them 1.23 MB
+on its own. `unusedTextures()` only offers up ones whose key looks like a
+uniform upload (`<teamCode>_<id>`), so team art is never dropped just because
+no string in the save spells it out.
 
 ### One design (a helmet, jersey, pants or socks)
 

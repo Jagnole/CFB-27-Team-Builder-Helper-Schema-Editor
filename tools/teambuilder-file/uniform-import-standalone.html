@@ -28,6 +28,8 @@
        margin: 0 0 12px; }
   label { display: block; font-weight: 600; margin: 12px 0 4px; }
   label:first-of-type { margin-top: 0; }
+  label.check { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  label.check input { margin: 0; }
   input[type=file] { width: 100%; }
   input[type=text], input[type=number], select {
     width: 100%; max-width: 320px; padding: 7px 9px; border: 1px solid var(--line);
@@ -69,7 +71,7 @@
 <main>
   <div id="banner">Starting up… if this message stays, the files this page needs
   (<code>tbfile.js</code>, <code>uniform.js</code>, <code>kitzip.js</code>,
-  <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
+  <code>imaging-web.js</code>, <code>textures.js</code>, <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
   page — download the whole <code>tools/teambuilder-file/</code> folder, or use
   <code>uniform-import-standalone.html</code>, which has everything in one file.</div>
   <h1>Team Builder Uniform Importer</h1>
@@ -106,16 +108,29 @@
       <div>
         <label for="texMode">Baked textures</label>
         <select id="texMode">
-          <option value="fit">Shrink to fit the save file</option>
+          <option value="fit">Fit them into the space there is</option>
           <option value="asis">Embed at full size</option>
           <option value="skip">Skip — recipe only</option>
         </select>
-        <div class="hint">A save file has a fixed size, so large images may not fit.</div>
+        <div class="hint">The biggest image is shrunk first, so detail stays where it counts.
+        A flat image is stored as a 4×4.</div>
       </div>
       <div>
-        <label for="maxDim">Shrink limit (px)</label>
-        <input type="number" id="maxDim" value="1024" min="128" max="4096" step="128">
-        <div class="hint">Longest edge when shrinking.</div>
+        <label for="maxDim">Starting size (px)</label>
+        <input type="number" id="maxDim" value="2048" min="128" max="4096" step="128">
+        <div class="hint">Longest edge before any fitting.</div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label class="check"><input type="checkbox" id="prune"> Reclaim unused images</label>
+        <div class="hint" id="pruneHint">Drops uploaded images no layer points at any more.</div>
+      </div>
+      <div>
+        <label class="check"><input type="checkbox" id="grow"> Write a bigger file (experimental)</label>
+        <div class="hint">A save file is exactly 7.5 MiB, which looks like a deliberate limit.
+        This rewrites the size fields in the header to make a larger one — it may simply be
+        rejected. Untested.</div>
       </div>
     </div>
   </section>
@@ -366,9 +381,28 @@
 
   // --------------------------------------------------------------- container
   const MAGIC = 'FBCHUNKS';
-  /* Offset 12 of the header block holds the size of the data region that
-     follows it, so the payload starts at fileSize - that value. */
-  const REGION_SIZE_OFFSET = 12;
+  /*
+   * 18-byte preamble, then two regions that together are exactly 7.5 MiB:
+   *   @0  "FBCHUNKS"
+   *   @8  uint16  version (1)
+   *   @10 uint32  header region size   (17,932 in the sample)
+   *   @14 uint32  data region size     (7,846,388 — where the zlib stream is)
+   * and the data region size appears a second time at @62. Nothing records
+   * how much of the data region is actually used, so the region size is the
+   * ceiling: 18 + 17,932 + 7,846,388 = 7,864,338 = 7.5 MiB + the preamble.
+   */
+  const PREAMBLE = 18;
+  const HEADER_SIZE_OFFSET = 10;
+  const REGION_SIZE_OFFSET = 14;
+  const REGION_SIZE_COPY_OFFSET = 62;
+
+  function readU32(b, o) {
+    return (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16)) + b[o + 3] * 0x1000000;
+  }
+  function writeU32(b, o, v) {
+    b[o] = v & 0xff; b[o + 1] = (v >>> 8) & 0xff; b[o + 2] = (v >>> 16) & 0xff;
+    b[o + 3] = Math.floor(v / 0x1000000) & 0xff;
+  }
 
   function isZlibHeader(bytes, i) {
     return i + 1 < bytes.length && bytes[i] === 0x78 &&
@@ -376,10 +410,10 @@
   }
 
   function findStream(bytes) {
-    const region = bytes[REGION_SIZE_OFFSET] | (bytes[REGION_SIZE_OFFSET + 1] << 8) |
-      (bytes[REGION_SIZE_OFFSET + 2] << 16) | (bytes[REGION_SIZE_OFFSET + 3] * 0x1000000);
-    const stated = bytes.length - region;
-    if (region > 0 && stated > 8 && isZlibHeader(bytes, stated)) return stated;
+    const stated = PREAMBLE + readU32(bytes, HEADER_SIZE_OFFSET);
+    if (stated > PREAMBLE && stated < bytes.length && isZlibHeader(bytes, stated)) return stated;
+    const fromRegion = bytes.length - readU32(bytes, REGION_SIZE_OFFSET);
+    if (fromRegion > PREAMBLE && fromRegion < bytes.length && isZlibHeader(bytes, fromRegion)) return fromRegion;
     for (let i = 8; i < bytes.length - 1; i++) if (isZlibHeader(bytes, i)) return i;
     return -1;
   }
@@ -430,20 +464,49 @@
     }
     /** Free space left in the container for a bigger compressed payload. */
     get freeSpace() { return this.totalSize - this.streamOffset - this.originalCompressedSize; }
+    /** Does the header declare its data region the way grow() expects? */
+    get regionFieldsMatch() {
+      const region = this.totalSize - this.streamOffset;
+      return readU32(this.header, REGION_SIZE_OFFSET) === region &&
+        readU32(this.header, REGION_SIZE_COPY_OFFSET) === region;
+    }
+
     /**
      * Rebuild the whole file around a new payload, keeping the header and the
-     * fixed total file size. Throws if the compressed payload no longer fits.
+     * fixed total file size.
+     *
+     * @param opts {{grow?:boolean, growAlign?:number}}
+     *   grow writes a LARGER data region and updates the two size fields in
+     *   the header to match. The sample file is exactly 7.5 MiB, which looks
+     *   like a deliberate save budget rather than a quirk of the format, so
+     *   whether Team Builder or the game accepts a bigger file is UNKNOWN.
+     *   Off by default for that reason.
      */
-    async build(payload, zlib) {
+    async build(payload, zlib, opts) {
+      opts = opts || {};
       const comp = normalizeZlibHeader(await zlib.deflate(payload));
       const used = this.streamOffset + comp.length;
-      if (used > this.totalSize) {
+      if (used <= this.totalSize) {
+        const out = new Uint8Array(this.totalSize);
+        out.set(this.header, 0);
+        out.set(comp, this.streamOffset);
+        return out;
+      }
+      if (!opts.grow) {
         throw new Error('payload too large for this save file: needs ' + used +
           ' bytes, container holds ' + this.totalSize +
           ' (over by ' + (used - this.totalSize) + ' bytes)');
       }
-      const out = new Uint8Array(this.totalSize);
+      if (!this.regionFieldsMatch) {
+        throw new Error('cannot grow this file: its header does not declare the data ' +
+          'region the way this tool understands, so the size fields cannot be updated safely');
+      }
+      const align = opts.growAlign || 0x10000;          // keep some slack, like the original
+      const region = Math.ceil((comp.length + 1) / align) * align;
+      const out = new Uint8Array(this.streamOffset + region);
       out.set(this.header, 0);
+      writeU32(out, REGION_SIZE_OFFSET, region);
+      writeU32(out, REGION_SIZE_COPY_OFFSET, region);
       out.set(comp, this.streamOffset);
       return out;
     }
@@ -479,7 +542,7 @@
   return {
     T, Reader, Writer, Container,
     parsePayload, buildPayload, readValue, writeValue, cloneNode, typeOf,
-    findStream, normalizeZlibHeader,
+    findStream, normalizeZlibHeader, PREAMBLE,
     field, setField, mapGet, mapSet, walk,
     zlibNode, zlibWeb, autoZlib,
   };
@@ -1022,6 +1085,277 @@
 
 </script>
 <script>
+/* imaging-web.js */
+/*
+ * imaging-web.js — the imaging interface textures.js wants, backed by the
+ * browser's own decoder and canvas. png.js does the same job in Node; it
+ * cannot be used here because it needs zlib synchronously and the browser
+ * only offers CompressionStream, which is async.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.TBImagingWeb = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  function canvasOf(w, h) {
+    if (typeof OffscreenCanvas !== 'undefined') return new OffscreenCanvas(w, h);
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  async function toBlob(canvas) {
+    if (canvas.convertToBlob) return canvas.convertToBlob({ type: 'image/png' });
+    return new Promise((res) => canvas.toBlob(res, 'image/png'));
+  }
+
+  async function decode(bytes) {
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: 'image/png' }));
+    const canvas = canvasOf(bitmap.width, bitmap.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(bitmap, 0, 0);
+    bitmap.close();
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    return { width: canvas.width, height: canvas.height, rgba: new Uint8Array(data.data.buffer) };
+  }
+
+  async function encode(img) {
+    const canvas = canvasOf(img.width, img.height);
+    const ctx = canvas.getContext('2d');
+    ctx.putImageData(new ImageData(new Uint8ClampedArray(img.rgba), img.width, img.height), 0, 0);
+    const blob = await toBlob(canvas);
+    return new Uint8Array(await blob.arrayBuffer());
+  }
+
+  /** Canvas resampling, which is smoother than a plain box filter. */
+  async function downscale(img, maxDim) {
+    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+    if (scale >= 1) return img;
+    const w = Math.max(1, Math.round(img.width * scale));
+    const h = Math.max(1, Math.round(img.height * scale));
+    const src = canvasOf(img.width, img.height);
+    src.getContext('2d').putImageData(
+      new ImageData(new Uint8ClampedArray(img.rgba), img.width, img.height), 0, 0);
+    const dst = canvasOf(w, h);
+    const ctx = dst.getContext('2d', { willReadFrequently: true });
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(src, 0, 0, w, h);
+    const data = ctx.getImageData(0, 0, w, h);
+    return { width: w, height: h, rgba: new Uint8Array(data.data.buffer) };
+  }
+
+  /** Same test as png.js: does this image carry any variation at all? */
+  function flatness(img, tolerance) {
+    const tol = tolerance == null ? 2 : tolerance;
+    const n = img.width * img.height;
+    const step = Math.max(1, Math.floor(n / 20000));
+    const min = [255, 255, 255, 255], max = [0, 0, 0, 0], sum = [0, 0, 0, 0];
+    let count = 0;
+    for (let i = 0; i < n; i += step) {
+      const s = i * 4;
+      for (let c = 0; c < 4; c++) {
+        const v = img.rgba[s + c];
+        if (v < min[c]) min[c] = v;
+        if (v > max[c]) max[c] = v;
+        sum[c] += v;
+      }
+      count++;
+    }
+    let spread = 0;
+    for (let c = 0; c < 4; c++) spread = Math.max(spread, max[c] - min[c]);
+    return { flat: spread <= tol, spread, colour: sum.map((v) => Math.round(v / count)) };
+  }
+
+  return { imaging: () => ({ decode, encode, downscale, flatness }) };
+});
+
+</script>
+<script>
+/* textures.js */
+/*
+ * textures.js — decide what to do with a uniform export's baked images so
+ * they fit the save file's space, and find images in a save file that
+ * nothing references any more.
+ *
+ * Two things make the difference in practice:
+ *   - an export's normal/rsm maps are often perfectly uniform, which tells
+ *     the renderer nothing and can cost megabytes;
+ *   - shrinking the biggest image first keeps detail where it matters,
+ *     instead of halving everything together.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) {
+    module.exports = factory(require('./tbfile.js'), require('./uniform.js'));
+  } else root.TBTextures = factory(root.TBFile, root.TBUniform);
+})(typeof self !== 'undefined' ? self : this, function (TB, U) {
+  'use strict';
+
+  const MIN_DIM = 128;
+
+  /** The PNG files a kit actually points at, largest first. */
+  function kitImageFiles(kit) {
+    const wanted = new Set();
+    for (const tex of kit.json.textures || []) if (tex.file) wanted.add(tex.file);
+    return [...wanted]
+      .filter((f) => kit.files.has(f))
+      .sort((a, b) => kit.files.get(b).length - kit.files.get(a).length);
+  }
+
+  /**
+   * Work out a set of images that fits `budget` bytes.
+   *
+   * @param kit    {json, files}
+   * @param opts   {budget, maxDim, skipFlat, imaging}
+   *   imaging is {decode, encode, downscale, flatness}; every call is awaited,
+   *   so a synchronous codec (png.js) and an async one (canvas) both work.
+   * @returns {Promise<{kit, decisions, totalBytes, fits}>}
+   */
+  async function planKitTextures(kit, opts) {
+    const im = opts.imaging;
+    const budget = opts.budget == null ? Infinity : opts.budget;
+    const startDim = opts.maxDim || 2048;
+    const skipFlat = opts.skipFlat !== false;
+
+    const files = new Map(kit.files);
+    const decisions = [];
+    const live = [];
+
+    for (const name of kitImageFiles(kit)) {
+      const original = files.get(name);
+      let img = null, note = null;
+      try {
+        img = await im.decode(original);
+      } catch (e) {
+        decisions.push({ file: name, action: 'keep', bytes: original.length, reason: 'not readable as PNG (' + e.message + ')' });
+        continue;
+      }
+      /*
+       * A uniform image still means something — a flat colour map IS the
+       * colour, a flat normal map is the neutral one the shader expects — so
+       * it is stored as a 4x4 instead of being thrown away. Same result on
+       * screen, a few dozen bytes instead of megabytes.
+       */
+      const flat = await im.flatness(img);
+      if (skipFlat && flat.flat) {
+        const tiny = await im.encode(await im.downscale(img, 4));
+        files.set(name, tiny);
+        decisions.push({
+          file: name, action: 'flatten', bytes: tiny.length, savedBytes: original.length - tiny.length,
+          reason: 'every pixel is rgb(' + flat.colour.slice(0, 3).join(',') + ') — kept as 4x4',
+        });
+        continue;
+      }
+      let bytes = original;
+      let dim = Math.max(img.width, img.height);
+      if (dim > startDim) {
+        img = await im.downscale(img, startDim);
+        bytes = await im.encode(img);
+        dim = Math.max(img.width, img.height);
+        note = 'shrunk to ' + dim + 'px';
+        files.set(name, bytes);
+      }
+      live.push({ name, img, bytes, dim, original, note });
+    }
+
+    /* Shrink the biggest image in turn until the set fits. */
+    const total = () => live.reduce((a, e) => a + e.bytes.length, 0);
+    let guard = 0;
+    while (total() > budget && guard++ < 40) {
+      live.sort((a, b) => b.bytes.length - a.bytes.length);
+      const worst = live[0];
+      const next = Math.max(MIN_DIM, Math.floor(worst.dim / 2));
+      if (next >= worst.dim) break;                       // cannot shrink further
+      worst.img = await im.downscale(worst.img, next);
+      worst.bytes = await im.encode(worst.img);
+      worst.dim = Math.max(worst.img.width, worst.img.height);
+      worst.note = 'shrunk to ' + worst.dim + 'px';
+      files.set(worst.name, worst.bytes);
+      if (live.every((e) => e.dim <= MIN_DIM)) break;
+    }
+
+    for (const e of live) {
+      decisions.push({
+        file: e.name,
+        action: e.note ? 'shrink' : 'keep',
+        bytes: e.bytes.length,
+        savedBytes: e.original.length - e.bytes.length,
+        reason: e.note || 'kept at ' + e.dim + 'px',
+      });
+    }
+    decisions.sort((a, b) => (b.savedBytes || 0) - (a.savedBytes || 0));
+    const totalBytes = total();
+    return { kit: { json: kit.json, files }, decisions, totalBytes, fits: totalBytes <= budget };
+  }
+
+  /**
+   * Which custom images does the save file still point at? A layer names an
+   * image by its table key, and other systems name one inside a longer asset
+   * path, so both an exact match and a substring count as a reference. The
+   * table's own url fields are ignored, since every key appears in its own.
+   */
+  function textureUsage(recs, loc) {
+    const keys = loc.textureMap.entries.map(([k]) => k);
+    const ownUrls = new Set();
+    for (const [, entry] of loc.textureMap.entries) {
+      const url = TB.field(entry, U.F.TEX_URL);
+      if (url && url.v) ownUrls.add(url.v);
+    }
+    const strings = [];
+    for (const rec of recs) {
+      TB.walk(rec.n, (node) => { if (node.k === 's' && node.v && !ownUrls.has(node.v)) strings.push(node.v); });
+    }
+    const usage = new Map();
+    for (const key of keys) {
+      let refs = 0;
+      for (const s of strings) if (s === key || s.indexOf(key) >= 0) refs++;
+      usage.set(key, refs);
+    }
+    return usage;
+  }
+
+  /**
+   * Images that nothing points at and that look like a uniform upload
+   * (`<teamCode>_<id>`), so team-wide art — a logo sheet, an end zone — is
+   * never touched even when no string in the save names it.
+   */
+  function unusedTextures(recs, loc) {
+    const usage = textureUsage(recs, loc);
+    const uploadPattern = new RegExp('^' + loc.teamCode + '_[A-Za-z0-9_]+$');
+    const out = [];
+    for (const [key, entry] of loc.textureMap.entries) {
+      if (usage.get(key) !== 0) continue;
+      const blob = TB.field(entry, U.F.TEX_BLOB);
+      const bytes = blob ? blob.v.length : 0;
+      if (!uploadPattern.test(key)) {
+        out.push({ key, bytes, prunable: false, reason: 'not a uniform upload — left alone' });
+        continue;
+      }
+      out.push({ key, bytes, prunable: true, reason: 'no layer points at it' });
+    }
+    return out;
+  }
+
+  /** Drop the named images from the save file's table. */
+  function pruneTextures(loc, keys) {
+    const drop = new Set(keys);
+    const before = loc.textureMap.entries.length;
+    let bytes = 0;
+    for (const [key, entry] of loc.textureMap.entries) {
+      if (!drop.has(key)) continue;
+      const blob = TB.field(entry, U.F.TEX_BLOB);
+      if (blob) bytes += blob.v.length;
+    }
+    loc.textureMap.entries = loc.textureMap.entries.filter(([k]) => !drop.has(k));
+    return { removed: before - loc.textureMap.entries.length, bytes };
+  }
+
+  return { kitImageFiles, planKitTextures, textureUsage, unusedTextures, pruneTextures, MIN_DIM };
+});
+
+</script>
+<script>
 /* uniform-import.js */
 /*
  * uniform-import.js — page logic for uniform-import.html.
@@ -1038,7 +1372,8 @@ const state = { save: null, kit: null, result: null };
  * folder. Saving the page on its own, or moving it away from them, leaves
  * every control inert — so say that out loud instead of doing nothing.
  */
-const REQUIRED = [['TBFile', 'tbfile.js'], ['TBUniform', 'uniform.js'], ['TBKitZip', 'kitzip.js']];
+const REQUIRED = [['TBFile', 'tbfile.js'], ['TBUniform', 'uniform.js'], ['TBKitZip', 'kitzip.js'],
+                  ['TBImagingWeb', 'imaging-web.js'], ['TBTextures', 'textures.js']];
 function bootCheck() {
   const missing = REQUIRED.filter(([global]) => typeof window[global] === 'undefined');
   const problems = [];
@@ -1068,6 +1403,7 @@ function bootCheck() {
 const ready = bootCheck();
 const zlibHost = ready ? TBFile.zlibWeb() : null;
 const inflateRaw = ready ? TBKitZip.inflateRawWeb() : null;
+const imaging = ready ? TBImagingWeb.imaging() : null;
 
 /* Anything that escapes a handler should land somewhere the user can see. */
 window.addEventListener('error', (e) => setStatus('Unexpected error: ' + e.message, true));
@@ -1103,8 +1439,14 @@ el('saveFile').addEventListener('change', async (e) => {
     const loc = TBUniform.locate(recs);
     state.save = { name: file.name, raw, container, recs, loc };
     const variants = TBUniform.listVariants(loc);
+    const unused = TBTextures.unusedTextures(recs, loc).filter((u) => u.prunable);
+    state.save.unused = unused;
     el('saveInfo').textContent = 'team ' + loc.teamCode + ' · uniforms: ' + variants.join(', ') +
       ' · ' + bytes(container.freeSpace) + ' spare space';
+    el('pruneHint').textContent = unused.length
+      ? unused.length + ' uploaded image(s) here, ' + bytes(unused.reduce((a, u) => a + u.bytes, 0)) +
+        ', are not used by any layer — tick to reclaim that space'
+      : 'Nothing to reclaim in this file — every uploaded image is in use.';
     const sel = el('sourceVariant');
     sel.innerHTML = '';
     for (const v of variants) {
@@ -1147,36 +1489,19 @@ el('kitFile').addEventListener('change', async (e) => {
 
 function refresh() { el('go').disabled = !(state.save && state.kit); }
 
-// ------------------------------------------------------------ png re-encoding
-/** Re-encode a PNG so it is at most maxDim on its longest edge. */
-async function shrinkPng(png, maxDim) {
-  const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }));
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  if (scale >= 1) { bitmap.close(); return png; }
-  const w = Math.max(1, Math.round(bitmap.width * scale));
-  const h = Math.max(1, Math.round(bitmap.height * scale));
-  const canvas = document.createElement('canvas');
-  canvas.width = w; canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(bitmap, 0, 0, w, h);
-  bitmap.close();
-  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-  const out = new Uint8Array(await blob.arrayBuffer());
-  return out.length < png.length ? out : png;
-}
+// --------------------------------------------------------------- the plan
+/* Space accounting: PNGs are already compressed, so they pass through the
+   save file's own zlib stream at roughly their own size. That makes the
+   container's free space (plus anything reclaimed) a fair budget. */
+const SAFETY_MARGIN = 64 * 1024;
 
-/** Shrink every image in the kit until the set fits the space we have. */
-async function fitTextures(kit, budget, startDim) {
-  const files = new Map(kit.files);
-  const names = [...files.keys()].filter((n) => /\.png$/i.test(n));
-  const total = () => names.reduce((a, n) => a + files.get(n).length, 0);
-  let dim = startDim;
-  while (total() > budget && dim >= 128) {
-    for (const n of names) files.set(n, await shrinkPng(files.get(n), dim));
-    dim = Math.floor(dim / 2);
-  }
-  return { json: kit.json, files, fitted: total() <= budget, finalDim: dim * 2, totalBytes: total() };
+async function planTextures(kit, budget) {
+  return TBTextures.planKitTextures(kit, {
+    budget,
+    maxDim: Number(el('maxDim').value) || 2048,
+    skipFlat: true,
+    imaging,
+  });
 }
 
 // ------------------------------------------------------------------ the build
@@ -1187,41 +1512,49 @@ el('go').addEventListener('click', async () => {
   try {
     const { container, recs, loc } = state.save;
     const mode = el('texMode').value;
-    /* Compressed PNGs barely shrink again inside the save file's own zlib
-       stream, so the free space is a fair budget for the images. */
-    const budget = Math.max(0, container.freeSpace - 64 * 1024);
-    let kit = state.kit;
-    let fitNote = '';
-    if (mode === 'fit') {
-      const fitted = await fitTextures(kit, budget, Number(el('maxDim').value) || 1024);
-      kit = { json: fitted.json, files: fitted.files };
-      fitNote = fitted.fitted
-        ? 'images shrunk to ' + bytes(fitted.totalBytes) + ' (max ' + fitted.finalDim + 'px)'
-        : 'images still ' + bytes(fitted.totalBytes) + ' after shrinking';
+    const grow = el('grow').checked;
+
+    let reclaimed = 0;
+    if (el('prune').checked && state.save.unused.length) {
+      const result = TBTextures.pruneTextures(loc, state.save.unused.map((u) => u.key));
+      reclaimed = result.bytes;
     }
+
+    let kit = state.kit;
+    let plan = null;
+    if (mode === 'fit') {
+      setStatus('Fitting the images…');
+      const budget = grow ? Infinity : Math.max(0, container.freeSpace + reclaimed - SAFETY_MARGIN);
+      plan = await planTextures(kit, budget);
+      kit = plan.kit;
+    }
+
     const name = TBUniform.sanitizeVariant(el('variantName').value || kit.json.uniformName || 'Imported');
     if (TBUniform.listVariants(loc).includes(name)) {
       throw new Error('this save already has a uniform called ' + name);
     }
+    setStatus('Writing the uniform…');
     const report = TBUniform.importKit(recs, kit, {
       name,
       source: el('sourceVariant').value || undefined,
       skipBakedTextures: mode === 'skip',
     });
     const payload = TBFile.buildPayload(recs);
-    const file = await container.build(payload, zlibHost);
+    const file = await container.build(payload, zlibHost, { grow });
     const used = container.compressedLengthOf(file.subarray(container.streamOffset));
     state.result = { file, name };
-    showReport(report, container, used, fitNote);
+    showReport(report, container, file, used, { plan, reclaimed });
     setStatus('Added "' + report.variant + '" — save file rebuilt.');
     el('download').style.display = '';
   } catch (err) {
     setStatus(err.message, true);
-    /* recs were mutated, so reload the save before another attempt */
+    /* recs and the texture table were mutated, so start from the file again */
     if (state.save) {
       const c = state.save.container;
       state.save.recs = TBFile.parsePayload(c.payload);
       state.save.loc = TBUniform.locate(state.save.recs);
+      state.save.unused = TBTextures.unusedTextures(state.save.recs, state.save.loc)
+        .filter((u) => u.prunable);
     }
   }
   el('go').disabled = false;
@@ -1243,15 +1576,23 @@ function list(id, items) {
   }
 }
 
-function showReport(report, container, used, fitNote) {
-  const space = container.totalSize - container.streamOffset;
+function showReport(report, container, file, used, extras) {
+  const space = file.length - container.streamOffset;
   const rows = [
     ['Uniform added', report.variant + ' (copied from ' + report.clonedFrom + ')'],
     ['Changes written', String(report.applied.length)],
     ['Images embedded', report.textures.length + (report.textures.length
       ? ' (' + bytes(report.textures.reduce((a, t) => a + t.bytes, 0)) + ')' : '')],
   ];
-  if (fitNote) rows.push(['Image sizing', fitNote]);
+  if (extras.reclaimed) rows.push(['Space reclaimed', bytes(extras.reclaimed) + ' of unused images']);
+  if (extras.plan) {
+    rows.push(['Images planned', bytes(extras.plan.totalBytes) +
+      (extras.plan.fits ? '' : ' — over budget')]);
+  }
+  if (file.length !== container.totalSize) {
+    rows.push(['File size', bytes(file.length) + ' — larger than the original ' +
+      bytes(container.totalSize) + ', which may be rejected']);
+  }
   el('summary').innerHTML = rows
     .map(([k, v]) => '<tr><th>' + k + '</th><td class="n">' + v + '</td></tr>').join('');
   const pct = Math.min(100, (used / space) * 100);
@@ -1260,7 +1601,13 @@ function showReport(report, container, used, fitNote) {
   bar.firstElementChild.style.width = pct.toFixed(1) + '%';
   el('spaceText').textContent = bytes(used) + ' of ' + bytes(space) + ' used · ' +
     bytes(space - used) + ' spare';
-  list('applied', report.applied);
+  const applied = report.applied.slice();
+  if (extras.plan) {
+    for (const d of extras.plan.decisions) {
+      applied.push('image ' + d.file + ' — ' + d.reason);
+    }
+  }
+  list('applied', applied);
   list('skipped', report.skipped);
   list('unmapped', report.unmapped);
   el('report').style.display = '';
