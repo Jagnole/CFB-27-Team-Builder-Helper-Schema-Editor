@@ -5,11 +5,11 @@
  *   node cli.js info       TEAMBUILDER-003
  *   node cli.js roundtrip  TEAMBUILDER-003
  *   node cli.js uniforms   TEAMBUILDER-003
- *   node cli.js clone      TEAMBUILDER-003 --from HOME --name Alt1 -o OUT
+ *   node cli.js clone      TEAMBUILDER-003 --from HOME --name Alt1 [--display "Alt 1"]
  *   node cli.js prune      TEAMBUILDER-003 [--apply] [-o OUT]
  *   node cli.js import     TEAMBUILDER-003 kit.zip [--name Alt1] [--from HOME]
- *                          [--prune] [--max-dim 2048] [--keep-flat]
- *                          [--skip-baked] [--grow] [-o OUT]
+ *                          [--display "Jordan Alt"] [--prune] [--max-dim 2048]
+ *                          [--keep-flat] [--skip-baked] [--grow] [-o OUT]
  *
  * Space: a save file is a fixed 7.5 MiB. --prune reclaims images nothing
  * points at, baked images are shrunk biggest-first to fit, and flat ones are
@@ -120,6 +120,8 @@ const CMDS = {
   async uniforms([path]) {
     const { recs } = await open(path);
     const loc = U.locate(recs);
+    const names = U.displayNames(loc);
+    if (!loc.uniformList) console.log('WARNING: no uniform list found in this file');
     for (const variant of U.listVariants(loc)) {
       const parts = U.SLOTS.map((slot) => {
         const piece = U.piece(loc, variant, slot);
@@ -127,7 +129,9 @@ const CMDS = {
         const mat = piece && U.layerArray(piece, 'material');
         return slot + '(' + (ov ? ov.items.length : 0) + ' overlays, ' + (mat ? mat.items.length : 0) + ' materials)';
       });
-      console.log(variant.padEnd(14) + parts.join('  '));
+      const listed = U.isListed(loc, variant);
+      console.log(variant.padEnd(14) + (listed ? 'in game as "' + names.get(variant) + '"' : 'NOT IN THE UNIFORM LIST').padEnd(28) +
+        parts.join('  '));
     }
   },
 
@@ -136,8 +140,9 @@ const CMDS = {
     const loc = U.locate(recs);
     const from = args.from || 'HOME';
     const name = U.sanitizeVariant(args.name || 'Copy');
-    U.cloneVariant(loc, from, name);
-    console.log('cloned ' + from + ' -> ' + name);
+    const result = U.cloneVariant(loc, from, name, { displayName: args.display });
+    console.log('cloned ' + from + ' -> ' + name + ', shown in game as "' + result.displayName + '"' +
+      (result.listed ? '' : '\n  WARNING: could not add it to the team uniform list, so the game will not offer it'));
     await save(container, recs, args.out || path.replace(/(\.[^./]*)?$/, '') + '-' + name);
   },
 
@@ -181,11 +186,14 @@ const CMDS = {
 
     const report = U.importKit(recs, kit, {
       name: args.name ? U.sanitizeVariant(args.name) : undefined,
+      displayName: args.display,
       source: args.from,
       skipBakedTextures: !!args['skip-baked'],
       maxTextureBytes: args['max-texture-bytes'] ? Number(args['max-texture-bytes']) : undefined,
     });
     console.log('variant        ' + report.variant + ' (cloned from ' + report.clonedFrom + ')');
+    console.log('shown in game  ' + (report.listed ? '"' + report.displayName + '"' :
+      'NO — the uniform list could not be updated'));
     console.log('applied        ' + report.applied.length + ' changes');
     for (const line of report.applied) console.log('   + ' + line);
     if (report.textures.length) {

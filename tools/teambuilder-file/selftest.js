@@ -45,11 +45,29 @@ const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
   check('uniforms found', variants.length > 0, variants.join(', '));
   check('every uniform resolves all four pieces',
     variants.every((v) => U.SLOTS.every((s) => !!U.piece(loc, v, s))));
+  check('uniform list found', !!loc.uniformList,
+    loc.uniformList ? loc.uniformList.items.length + ' entries' : 'MISSING — imports will not show in game');
+  check('every uniform is offered by the list', variants.every((v) => U.isListed(loc, v)),
+    [...U.displayNames(loc).values()].map((n) => '"' + n + '"').join(', '));
 
   // clone, then confirm the copy is independent of its source
   const source = variants.includes('HOME') ? 'HOME' : variants[0];
-  U.cloneVariant(loc, source, 'SelfTest');
+  const cloned = U.cloneVariant(loc, source, 'SelfTest', { displayName: 'Self Test' });
   check('clone adds a uniform', U.listVariants(loc).includes('SelfTest'));
+  check('clone is offered by the uniform list', U.isListed(loc, 'SelfTest') && cloned.listed,
+    'shown as "' + U.displayNames(loc).get('SelfTest') + '"');
+  check('clone is marked an alternate, not stock', (() => {
+    const entry = U.listEntryFor(loc, 'SelfTest');
+    const stock = TB.field(entry, U.F.UL_STOCK);
+    const gear = TB.field(entry, U.F.UL_GEAR);
+    const kind = gear && TB.field(gear, U.F.GEAR_KIND);
+    return stock && stock.v === 0 && kind && kind.v === 8;
+  })());
+  check('clone asset entries carry their slot id', U.SLOTS.every((slot) => {
+    const asset = TB.mapGet(loc.assetMap, U.assetKey(loc.teamCode, slot, 'SelfTest'));
+    const a = TB.field(asset, U.F.ASSET_SLOT), b = TB.field(asset, U.F.ASSET_BASE);
+    return a && b && a.v === b.v;
+  }));
   const clonePiece = U.piece(loc, 'SelfTest', 'jersey');
   const srcPiece = U.piece(loc, source, 'jersey');
   const cloneOverlay = U.layerArray(clonePiece, 'overlay').items[0];
@@ -79,6 +97,9 @@ const same = (a, b) => a.length === b.length && a.every((v, i) => v === b[i]);
     const loc2 = U.locate(recs2);
     check('imported uniform is present after a full re-read',
       U.listVariants(loc2).includes('SelfTestKit'));
+    check('imported uniform is offered by the list after a re-read',
+      U.isListed(loc2, 'SelfTestKit'),
+      'shown as "' + U.displayNames(loc2).get('SelfTestKit') + '"');
     const untouched = U.SLOTS.every((s) => {
       const a = U.piece(loc2, source, s);
       const w = new TB.Writer(); TB.writeValue(w, a);

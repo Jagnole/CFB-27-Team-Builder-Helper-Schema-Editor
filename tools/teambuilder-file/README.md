@@ -47,11 +47,11 @@ baked images until they fit, and shows how much space is left.
 node cli.js info      TEAMBUILDER-003        # header, space budget, uniforms
 node cli.js roundtrip TEAMBUILDER-003        # prove the codec on your own file
 node cli.js uniforms  TEAMBUILDER-003        # per-uniform layer counts
-node cli.js clone     TEAMBUILDER-003 --from HOME --name Alt1
+node cli.js clone     TEAMBUILDER-003 --from HOME --name Alt1 --display "Alt 1"
 node cli.js prune     TEAMBUILDER-003 [--apply]   # list/remove unused images
 node cli.js import    TEAMBUILDER-003 kit.zip [--name Alt1] [--from HOME]
-                      [--prune] [--max-dim 2048] [--keep-flat]
-                      [--skip-baked] [--grow] [-o OUT]
+                      [--display "Jordan Alt"] [--prune] [--max-dim 2048]
+                      [--keep-flat] [--skip-baked] [--grow] [-o OUT]
 ```
 
 `import` clones an existing uniform (`--from`, default `HOME`), then writes
@@ -60,7 +60,13 @@ not map. Without `-o` it writes `<input>-<VariantName>` next to the input.
 
 ## What the import writes
 
-Straight from `kit.json`:
+The uniform is registered the way the game expects: four designs, four asset
+entries, and an entry in the team's uniform list marked as an alternate, with
+the in-game name taken from the export (`--display` to override). `uniforms`
+prints whether each uniform is listed, so a missing one is visible without
+loading the game.
+
+Then, straight from `kit.json`:
 
 - **texture links** — every layer's colour / normal / rsm / layout slot that
   the kit gives as an in-game asset path
@@ -107,8 +113,11 @@ resolution and the file stays exactly its original size.
 
 ## Two things to know before using it in game
 
-1. **Nothing here has been tested in game.** The output is structurally
-   valid and re-reads correctly — that is what is proven. Keep a copy of the
-   original save file.
+1. **Partly tested in game.** A written file loads and the stock uniforms
+   render, which proves the container and the tree. An early version wrote
+   the uniform's designs but not the team's uniform list, so the extra
+   uniform never appeared; the list is written now (see `FORMAT.md` §3).
+   Whether an imported design renders exactly as the creator previews it is
+   still unconfirmed. Keep a copy of the original save file.
 2. **Mind the 7.5 MiB budget** — see *Space* above. `--grow` is there to
    test the limit, not to rely on.

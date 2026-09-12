@@ -119,8 +119,8 @@ Uniform asset entry (`#a95b8f` values):
 |-------|---------|
 | `#ee3c87` | asset name, e.g. `U_RCVVFYeAOa_JERSEY_HOME` |
 | `#6de8c2` | design slug, e.g. `RCVVFYeAOa-home-jersey` |
-| `#2f3bc3` | int, same per piece across variants (93 helmet, 162 jersey, 161 pants, 158 socks) — purpose unknown |
-| `#2f3bcf` | int, 446 for HOME/AWAY and the piece value for the others — purpose unknown (INFERRED: a "based on" or slot id) |
+| `#2f3bc3` | slot id: 93 helmet, 98 jersey, 97 pants, 94 socks (the same ids the uniform list uses) |
+| `#2f3bcf` | 254 on the stock Home and Away; the slot id on every alternate |
 
 Custom image entry (`#345ed2` values):
 
@@ -136,6 +136,44 @@ is dead weight; the sample had three, totalling 1.27 MB, one of them 1.23 MB
 on its own. `unusedTextures()` only offers up ones whose key looks like a
 uniform upload (`<teamCode>_<id>`), so team art is never dropped just because
 no string in the save spells it out.
+
+### The uniform list — what the game actually reads
+
+**Designs and asset entries are not enough.** The team object carries a list
+of the uniforms it offers, and a uniform missing from that list does not
+appear in game at all: the file loads, the stock uniforms work, and the extra
+one is simply never shown. That was confirmed the hard way — an import that
+wrote only the maps above loaded fine and never appeared.
+
+```
+#7448d2 / #74489a / #7a6ad3            the team
+  #ee3c87  "RCVVFYeAOa"                team code
+  #a95bb3  array of uniform entries    Home, Away, Darkout, Chill Dino
+```
+
+One entry:
+
+| field | meaning |
+|-------|---------|
+| `#a6f98e` | 1 on the stock Home and Away, 0 on an alternate |
+| `#2e0b93` | the name shown in game — free text, e.g. `Chill Dino` |
+| `#a4fc92`, `#733da6` | 0 in every entry seen |
+| `#73ead6` | the gear block |
+| &nbsp;&nbsp;`#7438b2` | 1 in every entry seen |
+| &nbsp;&nbsp;`#335bb2` | six slots: `{#ee9c92 label, #ee1ca6 asset, #704ecf slot id}` |
+| &nbsp;&nbsp;`#704eb3` | 6 = home, 3 = away, 8 = alternate |
+| &nbsp;&nbsp;`#704ebf` | 0 in every entry seen |
+
+Slot ids: 93 helmet, 98 jersey, 97 pants, 94 socks, 95 and 96 shoes. The
+helmet/jersey/pants/socks slots name a uniform asset entry; the two shoe
+slots name a shared asset (`U_GENERIC_SHOESX_WHIPRI`, sometimes written as a
+full `ContentShared/...` path). Labels are cosmetic: `HOME HELMET` on the
+stock uniforms, `Darkout Helmet` on the alternates.
+
+So a uniform exists in exactly two places — its four asset entries and its
+one list entry — and a search of the whole file for a variant's names finds
+nothing else. Adding one means writing both, with `#a6f98e` 0, `#704eb3` 8,
+and `#2f3bcf` switched from 254 to the slot id.
 
 ### One design (a helmet, jersey, pants or socks)
 
@@ -190,13 +228,20 @@ the colour-texture slot, `#22fb8e` as both a tint channel and a blend
 weight). With 24-bit ids that is most likely a collision, which is harmless
 as long as ids are only ever resolved inside a known parent.
 
-## 5. Untested
+## 5. What the game has confirmed, and what is still untested
 
-- Nothing written by this tool has been loaded **in game**. The file is
-  structurally valid and re-reads correctly; that is all that is proven.
+Loading a written file in game established that:
+
+- the container and the tagged tree are right — the team loads and the stock
+  uniforms render;
+- a uniform needs its entry in the team's uniform list, not just its designs
+  and asset entries. That is what the list section above is for.
+
+Still untested:
 - A locally added image has no CDN URL. Whether Team Builder uploads it on
   the next save, or ignores an image it has no URL for, is unknown.
-- `#2f3bc3` / `#2f3bcf` on the asset entry are copied from the source
-  variant unchanged.
+- `#a4fc92`, `#733da6`, `#7438b2` and `#704ebf` on a list entry are copied
+  from the source uniform; they are 0/1 in every entry in the sample, so
+  there was nothing to learn from.
 - The two print blocks, `#f4dc9a`/`#f4dcba`, and the third layer array are
   only partly understood, so the importer leaves them as cloned.

@@ -45,6 +45,17 @@
     LINK: 0x648ad3, LINK_FLAG: 0x259cd3,
     // uniform asset entry
     ASSET_NAME: 0xee3c87, ASSET_SLUG: 0x6de8c2,
+    ASSET_SLOT: 0x2f3bc3,     //   slot id: 93 helmet, 98 jersey, 97 pants, 94 socks
+    ASSET_BASE: 0x2f3bcf,     //   254 on the stock Home/Away, the slot id on an alternate
+    // the team's uniform list — what the game actually reads to offer a uniform
+    UL_STOCK: 0xa6f98e,       //   1 on Home/Away, 0 on an alternate
+    UL_NAME: 0x2e0b93,        //   the name shown in game ("Chill Dino")
+    UL_GEAR: 0x73ead6,
+    GEAR_ENABLED: 0x7438b2,
+    GEAR_SLOTS: 0x335bb2,     //     six slots: helmet, jersey, pants, socks, two shoes
+    SLOT_LABEL: 0xee9c92, SLOT_LINK: 0xee1ca6, SLOT_ID: 0x704ecf,
+    GEAR_KIND: 0x704eb3,      //     6 = home, 3 = away, 8 = alternate
+    UNIFORM_LIST: 0xa95bb3,
     // custom texture entry
     TEX_BLOB: 0x74488a, TEX_URL: 0x78498f,
   };
@@ -60,7 +71,7 @@
    * keeps working if unrelated parts of the file move around.
    */
   function locate(recs) {
-    const found = { assetMap: null, pieceMaps: {}, textureMap: null, teamCode: null };
+    const found = { assetMap: null, pieceMaps: {}, textureMap: null, teamCode: null, uniformList: null };
     for (const rec of recs) {
       TB.walk(rec.n, (node) => {
         if (node.k !== 'm' || !node.entries.length) return;
@@ -87,7 +98,47 @@
     for (const slot of SLOTS) {
       if (!found.pieceMaps[slot]) throw new Error('no ' + slot + ' design map found in this save file');
     }
+    found.uniformList = findUniformList(recs, found.assetMap);
     return found;
+  }
+
+  /**
+   * The team's uniform list. A design in the maps above is invisible in game
+   * unless this list offers it, so it is found by content: the array whose
+   * items name the most uniform assets.
+   */
+  function findUniformList(recs, assetMap) {
+    const assetNames = new Set(assetMap.entries.map(([k]) => k));
+    let best = null, bestScore = 0;
+    for (const rec of recs) {
+      TB.walk(rec.n, (node) => {
+        if (node.k !== 'a' || !node.items.length) return;
+        let score = 0;
+        for (const item of node.items) {
+          if (item.k !== 'o') return;
+          TB.walk(item, (n) => { if (n.k === 's' && assetNames.has(n.v)) score++; });
+        }
+        if (score > bestScore) { bestScore = score; best = node; }
+      });
+    }
+    return best;
+  }
+
+  /**
+   * Which list entry offers this variant, found through its asset names.
+   * Returns null for a variant the file does not have, so this can be asked
+   * before a clone as well as after one.
+   */
+  function listEntryFor(loc, name) {
+    const info = variants(loc).find((v) => v.name === name);
+    if (!loc.uniformList || !info) return null;
+    const wanted = new Set(Object.values(info.assets));
+    for (const item of loc.uniformList.items) {
+      let hit = false;
+      TB.walk(item, (n) => { if (n.k === 's' && wanted.has(n.v)) hit = true; });
+      if (hit) return item;
+    }
+    return null;
   }
 
   /**
@@ -120,6 +171,21 @@
     return v;
   }
 
+  /** Variant name -> the name shown in game, where the list gives one. */
+  function displayNames(loc) {
+    const out = new Map();
+    if (!loc.uniformList) return out;
+    for (const v of variants(loc)) {
+      const entry = listEntryFor(loc, v.name);
+      const nameField = entry && TB.field(entry, F.UL_NAME);
+      out.set(v.name, nameField ? nameField.v : v.name);
+    }
+    return out;
+  }
+
+  /** Is this variant offered by the team's uniform list? */
+  function isListed(loc, name) { return !!listEntryFor(loc, name); }
+
   /** The design object for one piece of one variant. */
   function piece(loc, name, slot) {
     return TB.mapGet(loc.pieceMaps[slot], variantInfo(loc, name).slugs[slot]);
@@ -128,15 +194,27 @@
   const assetKey = (code, slot, variant) => 'U_' + code + '_' + slot.toUpperCase() + '_' + variant;
   const slugKey = (code, slot, variant) => code + '-' + variant + '-' + slot;
 
+  const KIND_ALTERNATE = 8;
+  const STOCK_BASE_MARKER = 254;
+  const PIECE_WORD = { helmet: 'Helmet', jersey: 'Jersey', pants: 'Pants', socks: 'Socks' };
+
   /**
-   * Copy an existing variant into a new one. Every piece is deep-copied and
-   * any string in the copy that names the source variant is renamed, so the
-   * new uniform is self-consistent and the file stays valid.
+   * Copy an existing variant into a new one: the four designs, the four asset
+   * entries, AND an entry in the team's uniform list. The list is the part
+   * the game reads when it offers a uniform — without it the designs sit in
+   * the file unused, which is exactly what happened before this was found.
+   *
+   * @param opts {{displayName?:string}} the name shown in game; it may contain
+   *   spaces, unlike the variant id, which ends up inside asset names.
    */
-  function cloneVariant(loc, sourceVariant, newVariant) {
+  function cloneVariant(loc, sourceVariant, newVariant, opts) {
+    opts = opts || {};
     const code = loc.teamCode;
+    const displayName = opts.displayName || newVariant;
     if (listVariants(loc).includes(newVariant)) throw new Error('variant already exists: ' + newVariant);
     const src = variantInfo(loc, sourceVariant);
+    const renames = [];
+
     for (const slot of SLOTS) {
       const srcSlug = src.slugs[slot];
       const dstSlug = slugKey(code, slot, newVariant);
@@ -156,14 +234,66 @@
       const slugField = TB.field(asset, F.ASSET_SLUG);
       if (nameField) nameField.v = dstAssetName;
       if (slugField) slugField.v = dstSlug;
+      /* The stock Home and Away carry 254 here; every alternate carries its
+         own slot id, so a copy of a stock uniform has to be switched over. */
+      const slotField = TB.field(asset, F.ASSET_SLOT);
+      const baseField = TB.field(asset, F.ASSET_BASE);
+      if (slotField && baseField && baseField.v === STOCK_BASE_MARKER) baseField.v = slotField.v;
       TB.mapSet(loc.assetMap, dstAssetName, asset);
+      renames.push({ slot, from: srcAssetName, to: dstAssetName });
     }
-    return newVariant;
+
+    const listed = addListEntry(loc, sourceVariant, displayName, renames);
+    return { variant: newVariant, displayName, listed };
   }
 
-  /** Remove a variant from the asset map and all four design maps. */
+  /**
+   * Add the new uniform to the team's list, copying the source's entry and
+   * pointing it at the new assets.
+   */
+  function addListEntry(loc, sourceVariant, displayName, renames) {
+    const list = loc.uniformList;
+    const source = listEntryFor(loc, sourceVariant);
+    if (!list || !source) return false;
+    const entry = TB.cloneNode(source);
+
+    const nameField = TB.field(entry, F.UL_NAME);
+    if (nameField) nameField.v = displayName;
+    const stock = TB.field(entry, F.UL_STOCK);
+    if (stock) stock.v = 0;                       // a copy is never Home or Away
+
+    const gear = TB.field(entry, F.UL_GEAR);
+    if (gear) {
+      const kind = TB.field(gear, F.GEAR_KIND);
+      if (kind) kind.v = KIND_ALTERNATE;
+      const slots = TB.field(gear, F.GEAR_SLOTS);
+      if (slots && slots.k === 'a') {
+        for (const item of slots.items) {
+          const link = TB.field(item, F.SLOT_LINK);
+          const label = TB.field(item, F.SLOT_LABEL);
+          const match = link && renames.find((r) => r.from === link.v);
+          if (match) {
+            link.v = match.to;
+            if (label) label.v = displayName + ' ' + PIECE_WORD[match.slot];
+          } else if (label) {
+            /* shoes and anything else keep their asset, but follow the name */
+            const word = label.v.split(/\s+/).pop();
+            label.v = displayName + ' ' + word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+          }
+        }
+      }
+    }
+    list.items.push(entry);
+    return true;
+  }
+
+  /** Remove a variant from the uniform list, the asset map and the designs. */
   function removeVariant(loc, name) {
     const v = variantInfo(loc, name);
+    const entry = listEntryFor(loc, name);
+    if (entry && loc.uniformList) {
+      loc.uniformList.items = loc.uniformList.items.filter((it) => it !== entry);
+    }
     const assetKeys = Object.values(v.assets);
     loc.assetMap.entries = loc.assetMap.entries.filter(([k]) => !assetKeys.includes(k));
     for (const slot of SLOTS) {
@@ -420,9 +550,19 @@
     const variants = listVariants(loc);
     const source = opts.source || (variants.includes('HOME') ? 'HOME' : variants[0]);
     const name = opts.name || sanitizeVariant((kit.json && kit.json.uniformName) || 'Imported');
-    if (!variants.includes(name)) cloneVariant(loc, source, name);
+    const displayName = opts.displayName || (kit.json && kit.json.uniformName) || name;
+    let listed = isListed(loc, name);
+    if (!variants.includes(name)) {
+      const cloned = cloneVariant(loc, source, name, { displayName });
+      listed = cloned.listed;
+    }
     const report = applyKit(loc, name, kit, opts);
     report.clonedFrom = source;
+    report.displayName = displayName;
+    report.listed = listed;
+    if (!listed) {
+      report.unmapped.push('the team uniform list could not be found, so the game will not offer this uniform');
+    }
     return report;
   }
 
@@ -434,6 +574,7 @@
 
   return {
     F, SLOTS, locate, variants, listVariants, variantInfo, piece, cloneVariant, removeVariant,
+    findUniformList, listEntryFor, displayNames, isListed,
     addTexture, applyKit, importKit, sanitizeVariant,
     assetKey, slugKey, layerAt, layerArray, hexToRgb, randomTextureId,
   };

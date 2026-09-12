@@ -93,9 +93,14 @@
     <h2>Options</h2>
     <div class="row">
       <div>
-        <label for="variantName">New uniform name</label>
-        <input type="text" id="variantName" placeholder="from kit.json">
-        <div class="hint">Letters and numbers only — it becomes part of an asset name.</div>
+        <label for="displayName">Name shown in game</label>
+        <input type="text" id="displayName" placeholder="from kit.json">
+        <div class="hint">Spaces are fine — this is what the uniform is called in game.</div>
+      </div>
+      <div>
+        <label for="variantName">Internal id</label>
+        <input type="text" id="variantName" placeholder="from the name above">
+        <div class="hint">Letters and numbers only — it goes inside asset names.</div>
       </div>
       <div>
         <label for="sourceVariant">Start from</label>

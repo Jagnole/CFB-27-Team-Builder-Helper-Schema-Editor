@@ -89,10 +89,13 @@ el('saveFile').addEventListener('change', async (e) => {
         ', are not used by any layer — tick to reclaim that space'
       : 'Nothing to reclaim in this file — every uploaded image is in use.';
     const sel = el('sourceVariant');
+    const shownNames = TBUniform.displayNames(loc);
     sel.innerHTML = '';
     for (const v of variants) {
       const opt = document.createElement('option');
-      opt.value = opt.textContent = v;
+      opt.value = v;
+      const shown = shownNames.get(v);
+      opt.textContent = shown && shown !== v ? shown + '  (' + v + ')' : v;
       if (v === 'HOME') opt.selected = true;
       sel.appendChild(opt);
     }
@@ -116,6 +119,7 @@ el('kitFile').addEventListener('change', async (e) => {
     const total = pngs.reduce((a, [, b]) => a + b.length, 0);
     el('kitInfo').textContent = '"' + (kit.json.uniformName || 'unnamed') + '" · ' +
       (kit.json.layers || []).length + ' layers · ' + pngs.length + ' images (' + bytes(total) + ')';
+    if (!el('displayName').value) el('displayName').value = kit.json.uniformName || 'Imported';
     if (!el('variantName').value) {
       el('variantName').value = TBUniform.sanitizeVariant(kit.json.uniformName || 'Imported');
     }
@@ -170,13 +174,15 @@ el('go').addEventListener('click', async () => {
       kit = plan.kit;
     }
 
-    const name = TBUniform.sanitizeVariant(el('variantName').value || kit.json.uniformName || 'Imported');
+    const shown = el('displayName').value.trim() || kit.json.uniformName || 'Imported';
+    const name = TBUniform.sanitizeVariant(el('variantName').value || shown);
     if (TBUniform.listVariants(loc).includes(name)) {
       throw new Error('this save already has a uniform called ' + name);
     }
     setStatus('Writing the uniform…');
     const report = TBUniform.importKit(recs, kit, {
       name,
+      displayName: shown,
       source: el('sourceVariant').value || undefined,
       skipBakedTextures: mode === 'skip',
     });
@@ -221,6 +227,8 @@ function showReport(report, container, file, used, extras) {
   const space = file.length - container.streamOffset;
   const rows = [
     ['Uniform added', report.variant + ' (copied from ' + report.clonedFrom + ')'],
+    ['Shown in game as', report.listed ? '"' + report.displayName + '"'
+      : 'NOT LISTED — the game will not offer it'],
     ['Changes written', String(report.applied.length)],
     ['Images embedded', report.textures.length + (report.textures.length
       ? ' (' + bytes(report.textures.reduce((a, t) => a + t.bytes, 0)) + ')' : '')],
