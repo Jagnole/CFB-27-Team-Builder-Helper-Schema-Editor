@@ -39,6 +39,12 @@
            background: var(--accent); color: #fff; cursor: pointer; }
   button:disabled { opacity: .5; cursor: default; }
   button.ghost { background: transparent; color: var(--accent); border-color: var(--line); }
+  #banner { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+            margin-bottom: 16px; background: var(--panel); color: var(--muted); }
+  #banner.bad { border-color: var(--bad); color: var(--ink);
+                background: color-mix(in srgb, var(--bad) 12%, transparent); }
+  #banner b { display: block; margin-bottom: 4px; color: var(--ink); }
+  #banner code { font-family: var(--mono); font-size: 12.5px; }
   #status { margin: 12px 0 0; font-weight: 600; }
   #status.err { color: var(--bad); }
   #report { display: none; }
@@ -60,6 +66,11 @@
 </head>
 <body>
 <main>
+  <div id="banner">Starting up… if this message stays, the files this page needs
+  (<code>tbfile.js</code>, <code>uniform.js</code>, <code>kitzip.js</code>,
+  <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
+  page — download the whole <code>tools/teambuilder-file/</code> folder, or use
+  <code>uniform-import-standalone.html</code>, which has everything in one file.</div>
   <h1>Team Builder Uniform Importer</h1>
   <p class="sub">Adds a uniform exported from cfbuniformcreator.com to a Team Builder save file
   (<span class="n">TEAMBUILDER-00<i>n</i></span>) as an extra uniform, leaving the existing ones alone.

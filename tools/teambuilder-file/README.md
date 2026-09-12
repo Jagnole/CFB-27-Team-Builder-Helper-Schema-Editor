@@ -11,18 +11,28 @@ tagged tree. The codec round-trips a real save byte for byte, which is the
 check everything else rests on.
 
 ```
+uniform-import-standalone.html   the importer as ONE file — use this one
 tbfile.js      container + tree codec (browser and Node, no dependencies)
 uniform.js     find, list, clone and edit uniforms; apply a creator kit
 kitzip.js      reader for the creator's .zip export
 cli.js         Node command line
-uniform-import.html/.js   drag-and-drop importer page
+selftest.js    checks the codec and importer against your own files
+uniform-import.html/.js   the same page, split up, for loading in the extension
+build-standalone.js       regenerates the single-file build
 ```
 
 ## The page
 
-Open `uniform-import.html` in a browser (or load this folder as part of the
-extension and open the page from there): pick a save file, pick the export
-zip, press **Build uniform**, download the result. Nothing leaves the page.
+**Download `uniform-import-standalone.html` and open it.** Pick a save file,
+pick the export zip, press **Build uniform**, download the result. Nothing
+leaves the page.
+
+`uniform-import.html` is the same page with its scripts kept separate,
+because extension pages block inline scripts. It only works with
+`tbfile.js`, `uniform.js`, `kitzip.js` and `uniform-import.js` sitting in the
+same folder — on its own, every control stays inert and the page says so.
+After editing any of those, run `node build-standalone.js` to refresh the
+single-file build.
 
 Because a save file has a fixed size, the page offers to shrink the export's
 baked images until they fit, and shows how much space is left.

@@ -49,7 +49,9 @@ runs at the browser layer, where it can.
 - **Team Builder save file tools** (`tools/teambuilder-file/`) — read and
   edit a `TEAMBUILDER-00n` save file directly, and import a uniform
   exported from cfbuniformcreator.com into it as an extra uniform. Includes
-  a drag-and-drop page, a Node CLI, and a written spec of the save format
+  a single-file drag-and-drop page
+  (`tools/teambuilder-file/uniform-import-standalone.html`), a Node CLI, and
+  a written spec of the save format
   in `tools/teambuilder-file/FORMAT.md`. The codec round-trips a real save
   byte for byte; the uniform import has not been tested in game yet.
 - Runs entirely locally. Nothing is sent anywhere except EA's own servers

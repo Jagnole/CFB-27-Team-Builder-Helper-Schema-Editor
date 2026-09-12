@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Builder Uniform Importer</title>
+<!-- Single-file build: run node build-standalone.js to regenerate. -->
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #fff; --ink: #16181d; --muted: #5c6370;
+    --line: #d8dce3; --accent: #1c5fd6; --ok: #1a7f45; --warn: #8a5300; --bad: #b3261e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --panel: #1c1f25; --ink: #e8eaee; --muted: #a0a7b4;
+            --line: #2e333c; --accent: #6ba1ff; --ok: #5ed492; --warn: #e0b155; --bad: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+            padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 0 0 12px; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=file] { width: 100%; }
+  input[type=text], input[type=number], select {
+    width: 100%; max-width: 320px; padding: 7px 9px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .row > div { flex: 1 1 220px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  button { font: 600 15px/1 inherit; padding: 11px 18px; border-radius: 8px; border: 1px solid transparent;
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; color: var(--accent); border-color: var(--line); }
+  #banner { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+            margin-bottom: 16px; background: var(--panel); color: var(--muted); }
+  #banner.bad { border-color: var(--bad); color: var(--ink);
+                background: color-mix(in srgb, var(--bad) 12%, transparent); }
+  #banner b { display: block; margin-bottom: 4px; color: var(--ink); }
+  #banner code { font-family: var(--mono); font-size: 12.5px; }
+  #status { margin: 12px 0 0; font-weight: 600; }
+  #status.err { color: var(--bad); }
+  #report { display: none; }
+  .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0 2px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar.tight > i { background: var(--warn); }
+  .bar.over > i { background: var(--bad); }
+  ul { margin: 4px 0 0; padding-left: 18px; }
+  li { font-family: var(--mono); font-size: 12.5px; }
+  .plus li::marker { content: '+ '; color: var(--ok); }
+  .minus li::marker { content: '– '; color: var(--warn); }
+  .quest li::marker { content: '? '; color: var(--muted); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
+  td, th { text-align: left; padding: 3px 10px 3px 0; }
+  td.n { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <div id="banner">Starting up… if this message stays, the files this page needs
+  (<code>tbfile.js</code>, <code>uniform.js</code>, <code>kitzip.js</code>,
+  <code>uniform-import.js</code>) did not load. They have to sit in the same folder as this
+  page — download the whole <code>tools/teambuilder-file/</code> folder, or use
+  <code>uniform-import-standalone.html</code>, which has everything in one file.</div>
+  <h1>Team Builder Uniform Importer</h1>
+  <p class="sub">Adds a uniform exported from cfbuniformcreator.com to a Team Builder save file
+  (<span class="n">TEAMBUILDER-00<i>n</i></span>) as an extra uniform, leaving the existing ones alone.
+  Everything happens in this page — no upload.</p>
+
+  <section>
+    <h2>Files</h2>
+    <label for="saveFile">Team Builder save file</label>
+    <input type="file" id="saveFile">
+    <div class="hint" id="saveInfo">Pick the TEAMBUILDER-00n file from your save folder.</div>
+
+    <label for="kitFile">Uniform creator export (.zip)</label>
+    <input type="file" id="kitFile" accept=".zip,application/zip">
+    <div class="hint" id="kitInfo">The archive with <span class="n">kit.json</span> and a <span class="n">textures/</span> folder.</div>
+  </section>
+
+  <section>
+    <h2>Options</h2>
+    <div class="row">
+      <div>
+        <label for="variantName">New uniform name</label>
+        <input type="text" id="variantName" placeholder="from kit.json">
+        <div class="hint">Letters and numbers only — it becomes part of an asset name.</div>
+      </div>
+      <div>
+        <label for="sourceVariant">Start from</label>
+        <select id="sourceVariant"><option value="">(load a save file first)</option></select>
+        <div class="hint">The existing uniform that is copied, then edited.</div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="texMode">Baked textures</label>
+        <select id="texMode">
+          <option value="fit">Shrink to fit the save file</option>
+          <option value="asis">Embed at full size</option>
+          <option value="skip">Skip — recipe only</option>
+        </select>
+        <div class="hint">A save file has a fixed size, so large images may not fit.</div>
+      </div>
+      <div>
+        <label for="maxDim">Shrink limit (px)</label>
+        <input type="number" id="maxDim" value="1024" min="128" max="4096" step="128">
+        <div class="hint">Longest edge when shrinking.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <button id="go" disabled>Build uniform</button>
+    <button id="download" class="ghost" style="display:none">Download save file</button>
+    <p id="status"></p>
+  </section>
+
+  <section id="report">
+    <h2>Result</h2>
+    <table id="summary"></table>
+    <div class="bar" id="spaceBar"><i></i></div>
+    <div class="hint" id="spaceText"></div>
+    <details open><summary>Written</summary><ul class="plus" id="applied"></ul></details>
+    <details><summary>Skipped</summary><ul class="minus" id="skipped"></ul></details>
+    <details><summary>Not imported yet</summary><ul class="quest" id="unmapped"></ul></details>
+  </section>
+</main>
+<script>
+/* tbfile.js */
+/*
+ * tbfile.js — codec for EA CFB 27 Team Builder save files (TEAMBUILDER-00N).
+ *
+ * A save file is an "FBCHUNKS" container: a fixed-size header block, one raw
+ * zlib stream holding the whole team, then zero padding out to a fixed total
+ * file size. Inside the zlib stream is a tagged tree (see FORMAT.md).
+ *
+ * No dependencies. Works in the browser and in Node; the only host-specific
+ * part is zlib inflate/deflate, which is passed in (see zlibNode/zlibWeb).
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.TBFile = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // ---------------------------------------------------------------- value types
+  const T = {
+    INT: 0x00,   // varint, sign in the first byte
+    STR: 0x01,   // varint byte length (NUL included) + UTF-8 bytes
+    BLOB: 0x02,  // varint byte length + raw bytes (PNG uploads live here)
+    OBJ: 0x03,   // (hash24, type, value)* terminated by a 0x00 byte
+    ARR: 0x04,   // elemType, varint count, values
+    MAP: 0x05,   // keyType (always STR), valueType, varint count, (key, value)*
+    F32: 0x0a,   // 4 bytes, big-endian IEEE-754
+  };
+
+  // ------------------------------------------------------------------- reader
+  class Reader {
+    constructor(bytes) { this.b = bytes; this.p = 0; }
+    u8() { return this.b[this.p++]; }
+    peek() { return this.b[this.p]; }
+    raw(n) { const v = this.b.subarray(this.p, this.p + n); this.p += n; return v; }
+    /* The first byte carries 6 value bits, a sign bit (0x40) and a continue
+       bit (0x80); every further byte carries 7 more bits, low group first. */
+    num() {
+      let b = this.b[this.p++];
+      const neg = (b & 0x40) !== 0;
+      let v = b & 0x3f, sh = 6;
+      while (b & 0x80) {
+        b = this.b[this.p++];
+        v += (b & 0x7f) * Math.pow(2, sh);
+        sh += 7;
+      }
+      return neg ? -v : v;
+    }
+    str() {
+      const n = this.num();
+      if (n < 1) throw new Error('bad string length ' + n + ' at ' + this.p);
+      const bytes = this.raw(n);
+      if (bytes[n - 1] !== 0) throw new Error('unterminated string at ' + this.p);
+      return utf8Decode(bytes.subarray(0, n - 1));
+    }
+    hash24() { const b = this.b, p = this.p; this.p += 3; return b[p] | (b[p + 1] << 8) | (b[p + 2] << 16); }
+  }
+
+  // ------------------------------------------------------------------- writer
+  class Writer {
+    constructor() { this.chunks = []; this.len = 0; }
+    push(bytes) { this.chunks.push(bytes); this.len += bytes.length; }
+    u8(v) { this.push(Uint8Array.of(v & 0xff)); }
+    num(v) {
+      const neg = v < 0; let n = neg ? -v : v;
+      const out = [];
+      let first = (n % 64) | (neg ? 0x40 : 0);
+      let rest = Math.floor(n / 64);
+      out.push(first | (rest ? 0x80 : 0));
+      while (rest) {
+        const g = rest % 128;
+        rest = Math.floor(rest / 128);
+        out.push(g | (rest ? 0x80 : 0));
+      }
+      this.push(Uint8Array.from(out));
+    }
+    str(s) {
+      const body = utf8Encode(s);
+      this.num(body.length + 1);
+      this.push(body);
+      this.u8(0);
+    }
+    hash24(h) { this.push(Uint8Array.of(h & 0xff, (h >> 8) & 0xff, (h >> 16) & 0xff)); }
+    bytes() {
+      const out = new Uint8Array(this.len);
+      let o = 0;
+      for (const c of this.chunks) { out.set(c, o); o += c.length; }
+      return out;
+    }
+  }
+
+  // --------------------------------------------------------------- node model
+  // int  -> {k:'i', v:Number}          f32  -> {k:'f', v:Number}
+  // str  -> {k:'s', v:String}          blob -> {k:'b', v:Uint8Array}
+  // obj  -> {k:'o', m:[{h,t,n}, ...]}  (h = field hash24, t = type, n = node)
+  // arr  -> {k:'a', et:Number, items:[node, ...]}
+  // map  -> {k:'m', vt:Number, entries:[[key, node], ...]}
+
+  function readValue(r, t) {
+    switch (t) {
+      case T.INT: return { k: 'i', v: r.num() };
+      case T.STR: return { k: 's', v: r.str() };
+      case T.F32: return { k: 'f', v: readF32(r.raw(4)) };
+      case T.BLOB: return { k: 'b', v: r.raw(r.num()).slice() };
+      case T.OBJ: {
+        const m = [];
+        for (;;) {
+          if (r.peek() === 0) { r.p++; return { k: 'o', m }; }
+          const h = r.hash24(), tt = r.u8();
+          m.push({ h, t: tt, n: readValue(r, tt) });
+        }
+      }
+      case T.ARR: {
+        const et = r.u8(), n = r.num(), items = [];
+        for (let i = 0; i < n; i++) items.push(readValue(r, et));
+        return { k: 'a', et, items };
+      }
+      case T.MAP: {
+        const kt = r.u8(), vt = r.u8(), n = r.num();
+        if (kt !== T.STR) throw new Error('unsupported map key type ' + kt);
+        const entries = [];
+        for (let i = 0; i < n; i++) entries.push([r.str(), readValue(r, vt)]);
+        return { k: 'm', vt, entries };
+      }
+      default: throw new Error('unknown value type 0x' + t.toString(16) + ' at ' + r.p);
+    }
+  }
+
+  function writeValue(w, node) {
+    switch (node.k) {
+      case 'i': w.num(node.v); break;
+      case 's': w.str(node.v); break;
+      case 'f': w.push(writeF32(node.v)); break;
+      case 'b': w.num(node.v.length); w.push(node.v); break;
+      case 'o':
+        for (const f of node.m) { w.hash24(f.h); w.u8(f.t); writeValue(w, f.n); }
+        w.u8(0);
+        break;
+      case 'a':
+        w.u8(node.et); w.num(node.items.length);
+        for (const it of node.items) writeValue(w, it);
+        break;
+      case 'm':
+        w.u8(T.STR); w.u8(node.vt); w.num(node.entries.length);
+        for (const [key, v] of node.entries) { w.str(key); writeValue(w, v); }
+        break;
+      default: throw new Error('bad node kind ' + node.k);
+    }
+  }
+
+  const KIND_TO_TYPE = { i: T.INT, s: T.STR, f: T.F32, b: T.BLOB, o: T.OBJ, a: T.ARR, m: T.MAP };
+  function typeOf(node) { return KIND_TO_TYPE[node.k]; }
+
+  /** Parse the inflated payload: a flat sequence of top-level records. */
+  function parsePayload(bytes) {
+    const r = new Reader(bytes), recs = [];
+    while (r.p < bytes.length) {
+      const h = r.hash24(), t = r.u8();
+      recs.push({ h, t, n: readValue(r, t) });
+    }
+    return recs;
+  }
+
+  /** Serialize records back to payload bytes. */
+  function buildPayload(recs) {
+    const w = new Writer();
+    for (const rec of recs) { w.hash24(rec.h); w.u8(rec.t); writeValue(w, rec.n); }
+    return w.bytes();
+  }
+
+  function cloneNode(node) {
+    switch (node.k) {
+      case 'i': case 's': case 'f': return { k: node.k, v: node.v };
+      case 'b': return { k: 'b', v: node.v.slice() };
+      case 'o': return { k: 'o', m: node.m.map(f => ({ h: f.h, t: f.t, n: cloneNode(f.n) })) };
+      case 'a': return { k: 'a', et: node.et, items: node.items.map(cloneNode) };
+      case 'm': return { k: 'm', vt: node.vt, entries: node.entries.map(([k2, v]) => [k2, cloneNode(v)]) };
+      default: throw new Error('bad node kind ' + node.k);
+    }
+  }
+
+  // ------------------------------------------------------------------ helpers
+  function field(objNode, hash) {
+    if (!objNode || objNode.k !== 'o') return null;
+    const f = objNode.m.find(x => x.h === hash);
+    return f ? f.n : null;
+  }
+  function setField(objNode, hash, node) {
+    const f = objNode.m.find(x => x.h === hash);
+    if (f) { f.n = node; f.t = typeOf(node); return; }
+    objNode.m.push({ h: hash, t: typeOf(node), n: node });
+  }
+  function mapGet(mapNode, key) {
+    const e = mapNode.entries.find(x => x[0] === key);
+    return e ? e[1] : null;
+  }
+  function mapSet(mapNode, key, node) {
+    const e = mapNode.entries.find(x => x[0] === key);
+    if (e) { e[1] = node; return; }
+    mapNode.entries.push([key, node]);
+    mapNode.entries.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
+  }
+  /** Depth-first walk. cb(node, path) for every node. */
+  function walk(node, cb, path) {
+    path = path || '';
+    cb(node, path);
+    if (node.k === 'o') for (const f of node.m) walk(f.n, cb, path + '/#' + f.h.toString(16).padStart(6, '0'));
+    else if (node.k === 'a') node.items.forEach((it, i) => walk(it, cb, path + '[' + i + ']'));
+    else if (node.k === 'm') for (const [key, v] of node.entries) walk(v, cb, path + '/' + key);
+  }
+
+  // ------------------------------------------------------------------ f32 i/o
+  const _buf = new ArrayBuffer(4), _f32 = new Float32Array(_buf), _u8 = new Uint8Array(_buf);
+  function readF32(b) { _u8[0] = b[3]; _u8[1] = b[2]; _u8[2] = b[1]; _u8[3] = b[0]; return _f32[0]; }
+  function writeF32(v) { _f32[0] = v; return Uint8Array.of(_u8[3], _u8[2], _u8[1], _u8[0]); }
+
+  // ------------------------------------------------------------------- utf8
+  const _enc = typeof TextEncoder !== 'undefined' ? new TextEncoder() : null;
+  const _dec = typeof TextDecoder !== 'undefined' ? new TextDecoder('utf-8') : null;
+  function utf8Encode(s) {
+    if (_enc) return _enc.encode(s);
+    return Uint8Array.from(Buffer.from(s, 'utf8'));
+  }
+  function utf8Decode(b) {
+    if (_dec) return _dec.decode(b);
+    return Buffer.from(b).toString('utf8');
+  }
+
+  // --------------------------------------------------------------- container
+  const MAGIC = 'FBCHUNKS';
+  /* Offset 12 of the header block holds the size of the data region that
+     follows it, so the payload starts at fileSize - that value. */
+  const REGION_SIZE_OFFSET = 12;
+
+  function isZlibHeader(bytes, i) {
+    return i + 1 < bytes.length && bytes[i] === 0x78 &&
+      ((bytes[i] << 8) | bytes[i + 1]) % 31 === 0;
+  }
+
+  function findStream(bytes) {
+    const region = bytes[REGION_SIZE_OFFSET] | (bytes[REGION_SIZE_OFFSET + 1] << 8) |
+      (bytes[REGION_SIZE_OFFSET + 2] << 16) | (bytes[REGION_SIZE_OFFSET + 3] * 0x1000000);
+    const stated = bytes.length - region;
+    if (region > 0 && stated > 8 && isZlibHeader(bytes, stated)) return stated;
+    for (let i = 8; i < bytes.length - 1; i++) if (isZlibHeader(bytes, i)) return i;
+    return -1;
+  }
+
+  /* The game writes its stream at best compression (0x78 0xDA). Only the
+     informational level bits differ when another deflater writes it, so the
+     header is normalized to match; every inflater ignores those bits. */
+  function normalizeZlibHeader(bytes) {
+    if (bytes.length > 1 && bytes[0] === 0x78) bytes[1] = 0xda;
+    return bytes;
+  }
+
+  class Container {
+    /** @param {Uint8Array} raw  @param {{inflate:Function}} zlib */
+    static async open(raw, zlib) {
+      for (let i = 0; i < MAGIC.length; i++) {
+        if (raw[i] !== MAGIC.charCodeAt(i)) throw new Error('not a Team Builder save (no FBCHUNKS magic)');
+      }
+      const off = findStream(raw);
+      if (off < 0) throw new Error('no zlib stream found in container');
+      const c = new Container();
+      c.raw = raw;
+      c.streamOffset = off;
+      c.header = raw.slice(0, off);
+      c.totalSize = raw.length;
+      const tail = raw.subarray(off);
+      /* The browser's DecompressionStream refuses trailing bytes, so the zero
+         padding has to be cut off exactly. Trailing zeros are counted back,
+         then up to four are handed back in case the stream's own Adler-32
+         checksum ends in zero bytes. */
+      const trimmed = c.compressedLengthOf(tail);
+      let lastError = null;
+      for (let extra = 0; extra <= 4 && trimmed + extra <= tail.length; extra++) {
+        try {
+          c.payload = await zlib.inflate(tail.subarray(0, trimmed + extra));
+          c.originalCompressedSize = trimmed + extra;
+          return c;
+        } catch (e) { lastError = e; }
+      }
+      throw new Error('could not decompress the save payload: ' + (lastError && lastError.message));
+    }
+    /* Padding after the stream is all zero, so the real stream length is the
+       distance to the last non-zero byte. */
+    compressedLengthOf(tail) {
+      let end = tail.length;
+      while (end > 0 && tail[end - 1] === 0) end--;
+      return end;
+    }
+    /** Free space left in the container for a bigger compressed payload. */
+    get freeSpace() { return this.totalSize - this.streamOffset - this.originalCompressedSize; }
+    /**
+     * Rebuild the whole file around a new payload, keeping the header and the
+     * fixed total file size. Throws if the compressed payload no longer fits.
+     */
+    async build(payload, zlib) {
+      const comp = normalizeZlibHeader(await zlib.deflate(payload));
+      const used = this.streamOffset + comp.length;
+      if (used > this.totalSize) {
+        throw new Error('payload too large for this save file: needs ' + used +
+          ' bytes, container holds ' + this.totalSize +
+          ' (over by ' + (used - this.totalSize) + ' bytes)');
+      }
+      const out = new Uint8Array(this.totalSize);
+      out.set(this.header, 0);
+      out.set(comp, this.streamOffset);
+      return out;
+    }
+  }
+
+  // --------------------------------------------------------------- zlib hosts
+  /** Node host: pass require('zlib'). */
+  function zlibNode(zlibModule) {
+    return {
+      inflate: (b) => new Uint8Array(zlibModule.inflateSync(Buffer.from(b.buffer, b.byteOffset, b.byteLength))),
+      deflate: (b) => new Uint8Array(zlibModule.deflateSync(Buffer.from(b.buffer, b.byteOffset, b.byteLength), { level: 9 })),
+    };
+  }
+  /** Browser host: CompressionStream/DecompressionStream ('deflate' == zlib). */
+  function zlibWeb() {
+    const run = async (bytes, stream) => {
+      const rs = new Blob([bytes]).stream().pipeThrough(stream);
+      const buf = await new Response(rs).arrayBuffer();
+      return new Uint8Array(buf);
+    };
+    return {
+      inflate: (b) => run(b, new DecompressionStream('deflate')),
+      deflate: (b) => run(b, new CompressionStream('deflate')),
+    };
+  }
+  /** Pick whichever host we are running on. */
+  function autoZlib() {
+    if (typeof CompressionStream !== 'undefined') return zlibWeb();
+    // eslint-disable-next-line no-undef
+    return zlibNode(require('zlib'));
+  }
+
+  return {
+    T, Reader, Writer, Container,
+    parsePayload, buildPayload, readValue, writeValue, cloneNode, typeOf,
+    findStream, normalizeZlibHeader,
+    field, setField, mapGet, mapSet, walk,
+    zlibNode, zlibWeb, autoZlib,
+  };
+});
+
+</script>
+<script>
+/* uniform.js */
+/*
+ * uniform.js — read and edit the uniform section of a Team Builder save file,
+ * and import a uniform exported by cfbuniformcreator.com (kit.json + PNGs).
+ *
+ * Field hashes are the save file's own 24-bit field ids. They were recovered
+ * by structural analysis of a real save (see FORMAT.md); everything that is
+ * inferred rather than proven is marked INFERRED here and in FORMAT.md.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(require('./tbfile.js'));
+  else root.TBUniform = factory(root.TBFile);
+})(typeof self !== 'undefined' ? self : this, function (TB) {
+  'use strict';
+
+  const F = {
+    // piece (one helmet/jersey/pants/socks design)
+    LAYER_COMP: 0x383db2,     // container of the layer arrays
+    OVERLAYS: 0xa5fdb6,       // overlay_1..overlay_N
+    MATERIALS: 0x251db6,      // material_1..material_N
+    EXTRA_LAYERS: 0x2d998e,   // further layer array (purpose unconfirmed)
+    PRESET_LINK: 0x321cb6,    // preset asset path
+    DESIGN_NAME: 0x651bba,    // recipe/design name
+    // one layer (overlay or material)
+    LAYER_NAME: 0xafe9a6,     //   { LABEL, ? }
+    LABEL: 0xac18b2,
+    OVERRIDES: 0x733bcb,      //   { ?, ?, RSM }
+    RSM: 0x723bcb,            //   { SHININESS, REFLECTIVITY, METALNESS }
+    SHININESS: 0xebdcb6, REFLECTIVITY: 0xac59ca, METALNESS: 0x28ddce,
+    TINT: 0xb49bd2,           //   { COLOR_B, COLOR_G, COLOR_R, TINT_MODE }
+    TINT_MODE: 0xe4dbd2,
+    COLOR_B: 0x22fb8e, COLOR_G: 0x27fb8e, COLOR_R: 0x32fb8e,
+    TRANSFORM: 0xad29d3,
+    CLAMP: 0x76cd8e,          //   { U, V } 1/1 = clamped, 0/0 = tiling
+    OFFSET: 0xb369be,         //   { U, V }
+    ROTATE: 0x21fdca,         //   degrees
+    SCALE: 0x6c38ce,          //   { U, V }
+    PACKED_UV: 0xae4ccf,      //   { offsetV, scaleU, scaleV, offsetU } mirror
+    UV_W: 0xf758da, UV_X: 0xf858da, UV_Y: 0xf958da, UV_Z: 0xfa58da,
+    VEC_U: 0xf30bd7, VEC_V: 0xf30bdb,
+    BLEND: 0xa4cb8a,          //   { mode, color, normal, rsm, occlusion }
+    BLEND_MODE: 0xe4db8a, BLEND_COLOR: 0x22fb8e, BLEND_NORMAL: 0xa2fcba,
+    BLEND_RSM: 0xe238be, BLEND_OCCLUSION: 0x624bca,
+    TEXTURES: 0x338dd3,       //   { COLOR_TEX, LAYOUT_TEX, NORMAL_TEX, RSM_TEX, ... }
+    TEX_COLOR: 0x32fb8e, TEX_LAYOUT: 0x741eb2, TEX_NORMAL: 0xadfcba, TEX_RSM: 0xed2cd3,
+    LINK: 0x648ad3, LINK_FLAG: 0x259cd3,
+    // uniform asset entry
+    ASSET_NAME: 0xee3c87, ASSET_SLUG: 0x6de8c2,
+    // custom texture entry
+    TEX_BLOB: 0x74488a, TEX_URL: 0x78498f,
+  };
+
+  const SLOTS = ['helmet', 'jersey', 'pants', 'socks'];
+  const f32 = (v) => ({ k: 'f', v: v });
+  const int = (v) => ({ k: 'i', v: v });
+  const str = (v) => ({ k: 's', v: v });
+
+  // ------------------------------------------------------------------ locate
+  /**
+   * Find the uniform structures by shape, not by position, so the same code
+   * keeps working if unrelated parts of the file move around.
+   */
+  function locate(recs) {
+    const found = { assetMap: null, pieceMaps: {}, textureMap: null, teamCode: null };
+    for (const rec of recs) {
+      TB.walk(rec.n, (node) => {
+        if (node.k !== 'm' || !node.entries.length) return;
+        const keys = node.entries.map(e => e[0]);
+        const assetRe = /^U_([A-Za-z0-9]+)_(HELMET|JERSEY|PANTS|SOCKS)_(.+)$/;
+        if (!found.assetMap && keys.every(k => assetRe.test(k))) {
+          found.assetMap = node;
+          found.teamCode = keys[0].match(assetRe)[1];
+          return;
+        }
+        for (const slot of SLOTS) {
+          const re = new RegExp('^([A-Za-z0-9]+)-(.+)-' + slot + '$');
+          if (!found.pieceMaps[slot] && keys.every(k => re.test(k)) && node.vt === TB.T.OBJ) {
+            found.pieceMaps[slot] = node;
+          }
+        }
+        if (!found.textureMap && node.vt === TB.T.OBJ &&
+            node.entries.every(([, v]) => TB.field(v, F.TEX_BLOB) || TB.field(v, F.TEX_URL))) {
+          found.textureMap = node;
+        }
+      });
+    }
+    if (!found.assetMap) throw new Error('no uniform asset map found in this save file');
+    for (const slot of SLOTS) {
+      if (!found.pieceMaps[slot]) throw new Error('no ' + slot + ' design map found in this save file');
+    }
+    return found;
+  }
+
+  /**
+   * Index the variants in the file. The asset entry for each piece carries the
+   * design key it points at, so the design map keys are read from the data
+   * rather than rebuilt: the stock variants are named HOME/AWAY in asset names
+   * but home/away in design keys, and only the file knows which is which.
+   */
+  function variants(loc) {
+    const byName = new Map();
+    for (const [key, asset] of loc.assetMap.entries) {
+      const m = key.match(/^U_[A-Za-z0-9]+_(HELMET|JERSEY|PANTS|SOCKS)_(.+)$/);
+      if (!m) continue;
+      const slot = m[1].toLowerCase(), name = m[2];
+      if (!byName.has(name)) byName.set(name, { name, assets: {}, slugs: {} });
+      const v = byName.get(name);
+      v.assets[slot] = key;
+      const slugNode = TB.field(asset, F.ASSET_SLUG);
+      v.slugs[slot] = slugNode ? slugNode.v : slugKey(loc.teamCode, slot, name);
+    }
+    return Array.from(byName.values());
+  }
+
+  /** Variant names present in the file, e.g. ['HOME','AWAY','Darkout']. */
+  function listVariants(loc) { return variants(loc).map(v => v.name); }
+
+  function variantInfo(loc, name) {
+    const v = variants(loc).find(x => x.name === name);
+    if (!v) throw new Error('no such uniform variant: ' + name);
+    return v;
+  }
+
+  /** The design object for one piece of one variant. */
+  function piece(loc, name, slot) {
+    return TB.mapGet(loc.pieceMaps[slot], variantInfo(loc, name).slugs[slot]);
+  }
+
+  const assetKey = (code, slot, variant) => 'U_' + code + '_' + slot.toUpperCase() + '_' + variant;
+  const slugKey = (code, slot, variant) => code + '-' + variant + '-' + slot;
+
+  /**
+   * Copy an existing variant into a new one. Every piece is deep-copied and
+   * any string in the copy that names the source variant is renamed, so the
+   * new uniform is self-consistent and the file stays valid.
+   */
+  function cloneVariant(loc, sourceVariant, newVariant) {
+    const code = loc.teamCode;
+    if (listVariants(loc).includes(newVariant)) throw new Error('variant already exists: ' + newVariant);
+    const src = variantInfo(loc, sourceVariant);
+    for (const slot of SLOTS) {
+      const srcSlug = src.slugs[slot];
+      const dstSlug = slugKey(code, slot, newVariant);
+      const srcPiece = TB.mapGet(loc.pieceMaps[slot], srcSlug);
+      if (!srcPiece) throw new Error('source design missing: ' + srcSlug);
+      const copy = TB.cloneNode(srcPiece);
+      const srcAssetName = src.assets[slot];
+      const dstAssetName = assetKey(code, slot, newVariant);
+      TB.walk(copy, (node) => {
+        if (node.k !== 's' || !node.v) return;
+        node.v = node.v.split(srcSlug).join(dstSlug).split(srcAssetName).join(dstAssetName);
+      });
+      TB.mapSet(loc.pieceMaps[slot], dstSlug, copy);
+
+      const asset = TB.cloneNode(TB.mapGet(loc.assetMap, srcAssetName));
+      const nameField = TB.field(asset, F.ASSET_NAME);
+      const slugField = TB.field(asset, F.ASSET_SLUG);
+      if (nameField) nameField.v = dstAssetName;
+      if (slugField) slugField.v = dstSlug;
+      TB.mapSet(loc.assetMap, dstAssetName, asset);
+    }
+    return newVariant;
+  }
+
+  /** Remove a variant from the asset map and all four design maps. */
+  function removeVariant(loc, name) {
+    const v = variantInfo(loc, name);
+    const assetKeys = Object.values(v.assets);
+    loc.assetMap.entries = loc.assetMap.entries.filter(([k]) => !assetKeys.includes(k));
+    for (const slot of SLOTS) {
+      loc.pieceMaps[slot].entries = loc.pieceMaps[slot].entries.filter(([k]) => k !== v.slugs[slot]);
+    }
+  }
+
+  // --------------------------------------------------------------- texture io
+  const TEX_ID_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
+  function randomTextureId(code, rnd) {
+    let s = '';
+    for (let i = 0; i < 10; i++) s += TEX_ID_CHARS[Math.floor((rnd ? rnd() : Math.random()) * TEX_ID_CHARS.length)];
+    return code + '_' + s;
+  }
+
+  /**
+   * Store a PNG in the save file's custom-texture table and return its key.
+   * Uploaded textures in a real save also carry a cdn.mcr.ea.com URL; a
+   * locally added one has no URL yet, so the field is written empty
+   * (INFERRED: whether the game re-uploads it on save is untested).
+   */
+  function addTexture(loc, png, opts) {
+    opts = opts || {};
+    if (!loc.textureMap) throw new Error('this save file has no custom-texture table to add to');
+    const key = opts.key || randomTextureId(loc.teamCode, opts.random);
+    const entry = { k: 'o', m: [
+      { h: F.TEX_BLOB, t: TB.T.BLOB, n: { k: 'b', v: png } },
+      { h: F.TEX_URL, t: TB.T.STR, n: str(opts.url || '') },
+    ] };
+    TB.mapSet(loc.textureMap, key, entry);
+    return key;
+  }
+
+  // ------------------------------------------------------------- kit helpers
+  function hexToRgb(hex) {
+    const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || '').trim());
+    if (!m) return null;
+    const v = parseInt(m[1], 16);
+    return { r: ((v >> 16) & 255) / 255, g: ((v >> 8) & 255) / 255, b: (v & 255) / 255 };
+  }
+  function setColorStruct(node, rgb) {
+    if (!node || node.k !== 'o' || !rgb) return false;
+    TB.setField(node, F.COLOR_R, f32(rgb.r));
+    TB.setField(node, F.COLOR_G, f32(rgb.g));
+    TB.setField(node, F.COLOR_B, f32(rgb.b));
+    return true;
+  }
+  /** overlay_3 -> {kind:'overlay', index:2}; material_1 -> {kind:'material', index:0} */
+  function parseLayerName(name) {
+    const m = /^(overlay|material)_(\d+)$/.exec(String(name || ''));
+    if (!m) return null;
+    return { kind: m[1], index: parseInt(m[2], 10) - 1 };
+  }
+  function layerArray(piece, kind) {
+    const lc = TB.field(piece, F.LAYER_COMP);
+    if (!lc) return null;
+    return TB.field(lc, kind === 'material' ? F.MATERIALS : F.OVERLAYS);
+  }
+  function layerAt(piece, name) {
+    const ref = parseLayerName(name);
+    if (!ref) return null;
+    const arr = layerArray(piece, ref.kind);
+    if (!arr || arr.k !== 'a' || ref.index >= arr.items.length) return null;
+    return arr.items[ref.index];
+  }
+  const ROLE_FIELD = { color: F.TEX_COLOR, normal: F.TEX_NORMAL, rsm: F.TEX_RSM, layout: F.TEX_LAYOUT };
+
+  function setTextureLink(layer, role, link) {
+    const textures = TB.field(layer, F.TEXTURES);
+    const hash = ROLE_FIELD[String(role || '').toLowerCase()];
+    if (!textures || !hash) return false;
+    let slot = TB.field(textures, hash);
+    if (!slot) {
+      slot = { k: 'o', m: [{ h: F.LINK, t: TB.T.STR, n: str('') }, { h: F.LINK_FLAG, t: TB.T.INT, n: int(0) }] };
+      TB.setField(textures, hash, slot);
+    }
+    TB.setField(slot, F.LINK, str(link));
+    return true;
+  }
+
+  function setTransform(layer, xf) {
+    const t = TB.field(layer, F.TRANSFORM);
+    if (!t || !xf) return false;
+    const num = (v, dflt) => (typeof v === 'number' && isFinite(v) ? v : dflt);
+    const scaleU = num(xf.scaleU, 0), scaleV = num(xf.scaleV, 0);
+    const offU = num(xf.offsetU, 0), offV = num(xf.offsetV, 0);
+    const scale = TB.field(t, F.SCALE), offset = TB.field(t, F.OFFSET);
+    if (scale) { TB.setField(scale, F.VEC_U, f32(scaleU)); TB.setField(scale, F.VEC_V, f32(scaleV)); }
+    if (offset) { TB.setField(offset, F.VEC_U, f32(offU)); TB.setField(offset, F.VEC_V, f32(offV)); }
+    TB.setField(t, F.ROTATE, f32(num(xf.rotate, 0)));
+    if ('clampUv' in xf) {
+      const clamp = TB.field(t, F.CLAMP);
+      const c = xf.clampUv ? 1 : 0;
+      if (clamp) { TB.setField(clamp, F.VEC_U, f32(c)); TB.setField(clamp, F.VEC_V, f32(c)); }
+    }
+    // the packed mirror of offset/scale the renderer also reads
+    const packed = TB.field(t, F.PACKED_UV);
+    if (packed) {
+      TB.setField(packed, F.UV_W, f32(offV));
+      TB.setField(packed, F.UV_X, f32(scaleU));
+      TB.setField(packed, F.UV_Y, f32(scaleV));
+      TB.setField(packed, F.UV_Z, f32(offU));
+    }
+    return true;
+  }
+
+  function setBlend(layer, blend) {
+    const b = TB.field(layer, F.BLEND);
+    if (!b || !blend) return false;
+    const put = (hash, v) => { if (typeof v === 'number' && isFinite(v)) TB.setField(b, hash, f32(v)); };
+    put(F.BLEND_COLOR, blend.color);
+    put(F.BLEND_NORMAL, blend.normal);
+    put(F.BLEND_RSM, blend.rsm);
+    put(F.BLEND_OCCLUSION, blend.occlusion);
+    return true;
+  }
+
+  function setRsm(layer, rsm) {
+    const ov = TB.field(layer, F.OVERRIDES);
+    const target = ov && TB.field(ov, F.RSM);
+    if (!target || !rsm) return false;
+    const pct = (v) => (typeof v === 'number' && isFinite(v) ? (v > 1 ? v / 100 : v) : null);
+    const put = (hash, v) => { const n = pct(v); if (n !== null) TB.setField(target, hash, f32(n)); };
+    put(F.SHININESS, rsm.shininess);
+    put(F.REFLECTIVITY, rsm.reflectivity);
+    put(F.METALNESS, rsm.metalness);
+    return true;
+  }
+
+  const FONT_PATH_RE = /(characters\/player\/parts\/uniforms\/jerseys\/(numbers|name_fonts)\/)/i;
+  /** Replace every number/name font link in a piece with the kit's font. */
+  function setFontLinks(piece, kind, link) {
+    let n = 0;
+    TB.walk(piece, (node) => {
+      if (node.k !== 's' || !FONT_PATH_RE.test(node.v)) return;
+      const isName = /\/name_fonts\//i.test(node.v);
+      if ((kind === 'name') !== isName) return;
+      node.v = link;
+      n++;
+    });
+    return n;
+  }
+
+  // ----------------------------------------------------------------- kit apply
+  /**
+   * Write a cfbuniformcreator.com kit into one variant of the save file.
+   *
+   * @param loc      result of locate()
+   * @param variant  variant name to write into (must already exist; clone one first)
+   * @param kit      {json: parsed kit.json, files: Map<path, Uint8Array>}
+   * @param opts     {maxTextureBytes, skipBakedTextures, random}
+   * @returns a report of what was written and what was skipped
+   */
+  function applyKit(loc, variant, kit, opts) {
+    opts = opts || {};
+    const json = kit.json, files = kit.files || new Map();
+    const report = { variant, applied: [], skipped: [], textures: [], unmapped: [] };
+    const pieceFor = (slot) => piece(loc, variant, slot);
+
+    const slotName = (s) => String(s || '').toLowerCase();
+    const note = (list, what, detail) => list.push(detail ? what + ' (' + detail + ')' : what);
+
+    // 1. textures: in-game asset links, and PNGs uploaded from the creator
+    const texCache = new Map();
+    for (const tex of json.textures || []) {
+      const slot = slotName(tex.slot), pieceNode = pieceFor(slot);
+      const layer = pieceNode && layerAt(pieceNode, tex.layerName);
+      if (!layer) { note(report.skipped, 'texture ' + slot + '/' + tex.layerName + '/' + tex.role, 'no such layer'); continue; }
+      if (tex.link) {
+        if (setTextureLink(layer, tex.role, tex.link)) note(report.applied, 'texture link ' + slot + '/' + tex.layerName + '/' + tex.role);
+        else note(report.skipped, 'texture link ' + slot + '/' + tex.layerName + '/' + tex.role, 'unknown role');
+        continue;
+      }
+      if (!tex.file) continue;                       // empty slot in the kit
+      const png = files.get(tex.file);
+      if (!png) { note(report.skipped, 'texture ' + tex.file, 'not in kit archive'); continue; }
+      if (opts.skipBakedTextures) { note(report.skipped, 'texture ' + tex.file, 'baked textures skipped'); continue; }
+      if (opts.maxTextureBytes && png.length > opts.maxTextureBytes) {
+        note(report.skipped, 'texture ' + tex.file, png.length + ' bytes over the ' + opts.maxTextureBytes + ' byte limit');
+        continue;
+      }
+      let key = texCache.get(tex.file);
+      if (!key) {
+        key = addTexture(loc, png, { random: opts.random });
+        texCache.set(tex.file, key);
+        report.textures.push({ file: tex.file, key, bytes: png.length });
+      }
+      if (setTextureLink(layer, tex.role, key)) note(report.applied, 'texture ' + slot + '/' + tex.layerName + '/' + tex.role + ' -> ' + key);
+      else note(report.skipped, 'texture ' + tex.file, 'unknown role ' + tex.role);
+    }
+
+    // 2. tint colours
+    for (const col of json.colors || []) {
+      const slot = slotName(col.slot), pieceNode = pieceFor(slot);
+      const layer = pieceNode && layerAt(pieceNode, col.layerName);
+      const tint = layer && TB.field(layer, F.TINT);
+      const chan = { colorr: F.COLOR_R, colorg: F.COLOR_G, colorb: F.COLOR_B }[String(col.tint || '').toLowerCase()];
+      const rgb = hexToRgb(col.value);
+      if (!tint || !chan || !rgb) { note(report.skipped, 'colour ' + slot + '/' + col.layerName + '/' + col.tint); continue; }
+      if (setColorStruct(TB.field(tint, chan), rgb)) note(report.applied, 'colour ' + slot + '/' + col.layerName + '/' + col.tint + ' = ' + col.value);
+      else note(report.skipped, 'colour ' + slot + '/' + col.layerName + '/' + col.tint, 'no colour struct');
+    }
+
+    // 3. layer transform / blend / tint mode
+    for (const lay of json.layers || []) {
+      const slot = slotName(lay.slot), pieceNode = pieceFor(slot);
+      const layer = pieceNode && layerAt(pieceNode, lay.layerName);
+      if (!layer) { note(report.skipped, 'layer ' + slot + '/' + lay.layerName, 'no such layer'); continue; }
+      if (lay.transform && setTransform(layer, lay.transform)) note(report.applied, 'transform ' + slot + '/' + lay.layerName);
+      if (lay.blend && setBlend(layer, lay.blend)) note(report.applied, 'blend ' + slot + '/' + lay.layerName);
+      if (lay.rsm) setRsm(layer, lay.rsm);
+      if (lay.tintMode && /WithValue$/.test(lay.tintMode)) {
+        const tint = TB.field(layer, F.TINT);
+        if (tint) TB.setField(tint, F.TINT_MODE, int(0));
+      }
+      if (lay.label || lay.name) {
+        const nameNode = TB.field(layer, F.LAYER_NAME);
+        const label = nameNode && TB.field(nameNode, F.LABEL);
+        if (label) label.v = String(lay.label || lay.name);
+      }
+    }
+
+    // 4. fonts (patched by asset path, which is unambiguous in the file)
+    const printing = json.printing || {};
+    const numberFont = printing.jersey && printing.jersey.number && printing.jersey.number.font;
+    if (numberFont && numberFont.link) {
+      let n = 0;
+      for (const slot of SLOTS) { const p = pieceFor(slot); if (p) n += setFontLinks(p, 'number', numberFont.link); }
+      note(report.applied, 'number font -> ' + numberFont.link, n + ' field' + (n === 1 ? '' : 's'));
+    }
+    const nameFont = printing.jersey && printing.jersey.nameplate && printing.jersey.nameplate.font;
+    if (nameFont && nameFont.link) {
+      let n = 0;
+      for (const slot of SLOTS) { const p = pieceFor(slot); if (p) n += setFontLinks(p, 'name', nameFont.link); }
+      note(report.applied, 'nameplate font -> ' + nameFont.link, n + ' field' + (n === 1 ? '' : 's'));
+    }
+
+    // 5. parts of the kit this importer does not write yet
+    const unmapped = [
+      ['printing.*.colors / spacing / widthAdjustments / positions', printing.jersey || printing.helmet],
+      ['helmetSettings.facemaskColor', json.helmetSettings && json.helmetSettings.facemaskColor],
+      ['socksSettings.underSockColor', json.socksSettings && json.socksSettings.underSockColor],
+      ['accessoryPalette', json.accessoryPalette && json.accessoryPalette.enabled],
+      ['cidMasks', json.cidMasks && json.cidMasks.length],
+    ];
+    for (const [what, present] of unmapped) if (present) report.unmapped.push(what);
+    return report;
+  }
+
+  /** Convenience: clone a source variant and immediately write a kit into it. */
+  function importKit(recs, kit, opts) {
+    opts = opts || {};
+    const loc = locate(recs);
+    const variants = listVariants(loc);
+    const source = opts.source || (variants.includes('HOME') ? 'HOME' : variants[0]);
+    const name = opts.name || sanitizeVariant((kit.json && kit.json.uniformName) || 'Imported');
+    if (!variants.includes(name)) cloneVariant(loc, source, name);
+    const report = applyKit(loc, name, kit, opts);
+    report.clonedFrom = source;
+    return report;
+  }
+
+  /** Variant names live inside asset paths, so keep them path-safe. */
+  function sanitizeVariant(s) {
+    const v = String(s).replace(/[^A-Za-z0-9]+/g, '');
+    return v || 'Imported';
+  }
+
+  return {
+    F, SLOTS, locate, variants, listVariants, variantInfo, piece, cloneVariant, removeVariant,
+    addTexture, applyKit, importKit, sanitizeVariant,
+    assetKey, slugKey, layerAt, layerArray, hexToRgb, randomTextureId,
+  };
+});
+
+</script>
+<script>
+/* kitzip.js */
+/*
+ * kitzip.js — minimal reader for the .zip a cfbuniformcreator.com export
+ * comes in (kit.json plus a textures/ folder). Handles stored and deflated
+ * entries, which is all the export uses. No dependencies.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.TBKitZip = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  const u16 = (b, o) => b[o] | (b[o + 1] << 8);
+  const u32 = (b, o) => (b[o] | (b[o + 1] << 8) | (b[o + 2] << 16)) + b[o + 3] * 0x1000000;
+
+  function findEOCD(b) {
+    for (let i = b.length - 22; i >= 0 && i > b.length - 0x10000; i--) {
+      if (b[i] === 0x50 && b[i + 1] === 0x4b && b[i + 2] === 0x05 && b[i + 3] === 0x06) return i;
+    }
+    return -1;
+  }
+
+  /** @returns {Promise<Map<string, Uint8Array>>} path -> contents */
+  async function read(bytes, inflateRaw) {
+    const eocd = findEOCD(bytes);
+    if (eocd < 0) throw new Error('not a zip archive');
+    const count = u16(bytes, eocd + 10);
+    let p = u32(bytes, eocd + 16);
+    const out = new Map();
+    for (let i = 0; i < count; i++) {
+      if (u32(bytes, p) !== 0x02014b50) throw new Error('bad zip central directory at ' + p);
+      const method = u16(bytes, p + 10);
+      const compSize = u32(bytes, p + 20);
+      const nameLen = u16(bytes, p + 28);
+      const extraLen = u16(bytes, p + 30);
+      const commentLen = u16(bytes, p + 32);
+      const localOff = u32(bytes, p + 42);
+      const name = decodeName(bytes.subarray(p + 46, p + 46 + nameLen));
+      p += 46 + nameLen + extraLen + commentLen;
+      if (name.endsWith('/')) continue;
+      if (u32(bytes, localOff) !== 0x04034b50) throw new Error('bad zip local header for ' + name);
+      const lNameLen = u16(bytes, localOff + 26);
+      const lExtraLen = u16(bytes, localOff + 28);
+      const dataStart = localOff + 30 + lNameLen + lExtraLen;
+      const raw = bytes.subarray(dataStart, dataStart + compSize);
+      if (method === 0) out.set(name, raw.slice());
+      else if (method === 8) out.set(name, await inflateRaw(raw));
+      else throw new Error('unsupported zip compression method ' + method + ' for ' + name);
+    }
+    return out;
+  }
+
+  function decodeName(b) {
+    if (typeof TextDecoder !== 'undefined') return new TextDecoder('utf-8').decode(b);
+    return Buffer.from(b).toString('utf8');
+  }
+
+  /** Read an export and return {json, files}. */
+  async function readKit(bytes, inflateRaw) {
+    const files = await read(bytes, inflateRaw);
+    let jsonName = null;
+    for (const name of files.keys()) {
+      if (/(^|\/)kit\.json$/i.test(name)) { jsonName = name; break; }
+    }
+    if (!jsonName) throw new Error('no kit.json in this archive — is it a uniform creator export?');
+    const text = typeof TextDecoder !== 'undefined'
+      ? new TextDecoder('utf-8').decode(files.get(jsonName))
+      : Buffer.from(files.get(jsonName)).toString('utf8');
+    const prefix = jsonName.slice(0, jsonName.length - 'kit.json'.length);
+    const rebased = new Map();
+    for (const [name, data] of files) {
+      rebased.set(prefix && name.startsWith(prefix) ? name.slice(prefix.length) : name, data);
+    }
+    return { json: JSON.parse(text), files: rebased };
+  }
+
+  function inflateRawNode(zlibModule) {
+    return (b) => new Uint8Array(zlibModule.inflateRawSync(Buffer.from(b.buffer, b.byteOffset, b.byteLength)));
+  }
+  function inflateRawWeb() {
+    return async (b) => {
+      const rs = new Blob([b]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      return new Uint8Array(await new Response(rs).arrayBuffer());
+    };
+  }
+
+  return { read, readKit, inflateRawNode, inflateRawWeb };
+});
+
+</script>
+<script>
+/* uniform-import.js */
+/*
+ * uniform-import.js — page logic for uniform-import.html.
+ * Reads a Team Builder save file and a uniform creator export in the browser,
+ * writes the uniform in as an extra variant, and hands back a new save file.
+ */
+'use strict';
+
+const el = (id) => document.getElementById(id);
+const state = { save: null, kit: null, result: null };
+
+/*
+ * This page needs tbfile.js, uniform.js and kitzip.js loaded from the same
+ * folder. Saving the page on its own, or moving it away from them, leaves
+ * every control inert — so say that out loud instead of doing nothing.
+ */
+const REQUIRED = [['TBFile', 'tbfile.js'], ['TBUniform', 'uniform.js'], ['TBKitZip', 'kitzip.js']];
+function bootCheck() {
+  const missing = REQUIRED.filter(([global]) => typeof window[global] === 'undefined');
+  const problems = [];
+  if (missing.length) {
+    problems.push('These files did not load: <code>' + missing.map(m => m[1]).join('</code>, <code>') +
+      '</code>. They have to sit in the same folder as this page. Downloading the whole ' +
+      '<code>tools/teambuilder-file/</code> folder fixes it — or use ' +
+      '<code>uniform-import-standalone.html</code>, which has everything in one file.');
+  }
+  if (typeof CompressionStream === 'undefined') {
+    problems.push('This browser has no <code>CompressionStream</code>, which the page needs to write ' +
+      'the save file. Chrome, Edge or a current Firefox will work.');
+  }
+  const banner = el('banner');
+  if (!problems.length) {
+    /* The notice is in the static HTML so it shows even when these scripts
+       never load; getting this far means it can go. */
+    banner.hidden = true;
+    return true;
+  }
+  banner.className = 'bad';
+  banner.innerHTML = '<b>This page cannot run here</b>' + problems.join('<br><br>');
+  for (const id of ['saveFile', 'kitFile', 'go']) el(id).disabled = true;
+  return false;
+}
+
+const ready = bootCheck();
+const zlibHost = ready ? TBFile.zlibWeb() : null;
+const inflateRaw = ready ? TBKitZip.inflateRawWeb() : null;
+
+/* Anything that escapes a handler should land somewhere the user can see. */
+window.addEventListener('error', (e) => setStatus('Unexpected error: ' + e.message, true));
+window.addEventListener('unhandledrejection', (e) => setStatus('Unexpected error: ' +
+  ((e.reason && e.reason.message) || e.reason), true));
+
+function setStatus(text, isError) {
+  const s = el('status');
+  s.textContent = text || '';
+  s.className = isError ? 'err' : '';
+}
+const bytes = (n) => (n < 1024 ? n + ' B'
+  : n < 1024 * 1024 ? (n / 1024).toFixed(0) + ' KB'
+  : (n / 1048576).toFixed(2) + ' MB');
+
+function readFile(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(new Uint8Array(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsArrayBuffer(file);
+  });
+}
+
+// ------------------------------------------------------------------ save file
+el('saveFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const raw = await readFile(file);
+    const container = await TBFile.Container.open(raw, zlibHost);
+    const recs = TBFile.parsePayload(container.payload);
+    const loc = TBUniform.locate(recs);
+    state.save = { name: file.name, raw, container, recs, loc };
+    const variants = TBUniform.listVariants(loc);
+    el('saveInfo').textContent = 'team ' + loc.teamCode + ' · uniforms: ' + variants.join(', ') +
+      ' · ' + bytes(container.freeSpace) + ' spare space';
+    const sel = el('sourceVariant');
+    sel.innerHTML = '';
+    for (const v of variants) {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = v;
+      if (v === 'HOME') opt.selected = true;
+      sel.appendChild(opt);
+    }
+    setStatus('');
+  } catch (err) {
+    state.save = null;
+    el('saveInfo').textContent = '';
+    setStatus('Could not read that save file: ' + err.message, true);
+  }
+  refresh();
+});
+
+// -------------------------------------------------------------------- kit zip
+el('kitFile').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  try {
+    const kit = await TBKitZip.readKit(await readFile(file), inflateRaw);
+    state.kit = kit;
+    const pngs = [...kit.files.entries()].filter(([n]) => /\.png$/i.test(n));
+    const total = pngs.reduce((a, [, b]) => a + b.length, 0);
+    el('kitInfo').textContent = '"' + (kit.json.uniformName || 'unnamed') + '" · ' +
+      (kit.json.layers || []).length + ' layers · ' + pngs.length + ' images (' + bytes(total) + ')';
+    if (!el('variantName').value) {
+      el('variantName').value = TBUniform.sanitizeVariant(kit.json.uniformName || 'Imported');
+    }
+    setStatus('');
+  } catch (err) {
+    state.kit = null;
+    el('kitInfo').textContent = '';
+    setStatus('Could not read that export: ' + err.message, true);
+  }
+  refresh();
+});
+
+function refresh() { el('go').disabled = !(state.save && state.kit); }
+
+// ------------------------------------------------------------ png re-encoding
+/** Re-encode a PNG so it is at most maxDim on its longest edge. */
+async function shrinkPng(png, maxDim) {
+  const bitmap = await createImageBitmap(new Blob([png], { type: 'image/png' }));
+  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+  if (scale >= 1) { bitmap.close(); return png; }
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  bitmap.close();
+  const blob = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+  const out = new Uint8Array(await blob.arrayBuffer());
+  return out.length < png.length ? out : png;
+}
+
+/** Shrink every image in the kit until the set fits the space we have. */
+async function fitTextures(kit, budget, startDim) {
+  const files = new Map(kit.files);
+  const names = [...files.keys()].filter((n) => /\.png$/i.test(n));
+  const total = () => names.reduce((a, n) => a + files.get(n).length, 0);
+  let dim = startDim;
+  while (total() > budget && dim >= 128) {
+    for (const n of names) files.set(n, await shrinkPng(files.get(n), dim));
+    dim = Math.floor(dim / 2);
+  }
+  return { json: kit.json, files, fitted: total() <= budget, finalDim: dim * 2, totalBytes: total() };
+}
+
+// ------------------------------------------------------------------ the build
+el('go').addEventListener('click', async () => {
+  el('go').disabled = true;
+  el('download').style.display = 'none';
+  setStatus('Working…');
+  try {
+    const { container, recs, loc } = state.save;
+    const mode = el('texMode').value;
+    /* Compressed PNGs barely shrink again inside the save file's own zlib
+       stream, so the free space is a fair budget for the images. */
+    const budget = Math.max(0, container.freeSpace - 64 * 1024);
+    let kit = state.kit;
+    let fitNote = '';
+    if (mode === 'fit') {
+      const fitted = await fitTextures(kit, budget, Number(el('maxDim').value) || 1024);
+      kit = { json: fitted.json, files: fitted.files };
+      fitNote = fitted.fitted
+        ? 'images shrunk to ' + bytes(fitted.totalBytes) + ' (max ' + fitted.finalDim + 'px)'
+        : 'images still ' + bytes(fitted.totalBytes) + ' after shrinking';
+    }
+    const name = TBUniform.sanitizeVariant(el('variantName').value || kit.json.uniformName || 'Imported');
+    if (TBUniform.listVariants(loc).includes(name)) {
+      throw new Error('this save already has a uniform called ' + name);
+    }
+    const report = TBUniform.importKit(recs, kit, {
+      name,
+      source: el('sourceVariant').value || undefined,
+      skipBakedTextures: mode === 'skip',
+    });
+    const payload = TBFile.buildPayload(recs);
+    const file = await container.build(payload, zlibHost);
+    const used = container.compressedLengthOf(file.subarray(container.streamOffset));
+    state.result = { file, name };
+    showReport(report, container, used, fitNote);
+    setStatus('Added "' + report.variant + '" — save file rebuilt.');
+    el('download').style.display = '';
+  } catch (err) {
+    setStatus(err.message, true);
+    /* recs were mutated, so reload the save before another attempt */
+    if (state.save) {
+      const c = state.save.container;
+      state.save.recs = TBFile.parsePayload(c.payload);
+      state.save.loc = TBUniform.locate(state.save.recs);
+    }
+  }
+  el('go').disabled = false;
+});
+
+function list(id, items) {
+  const ul = el(id);
+  ul.innerHTML = '';
+  for (const item of items) {
+    const li = document.createElement('li');
+    li.textContent = item;
+    ul.appendChild(li);
+  }
+  if (!items.length) {
+    const li = document.createElement('li');
+    li.textContent = '(none)';
+    li.style.opacity = '.6';
+    ul.appendChild(li);
+  }
+}
+
+function showReport(report, container, used, fitNote) {
+  const space = container.totalSize - container.streamOffset;
+  const rows = [
+    ['Uniform added', report.variant + ' (copied from ' + report.clonedFrom + ')'],
+    ['Changes written', String(report.applied.length)],
+    ['Images embedded', report.textures.length + (report.textures.length
+      ? ' (' + bytes(report.textures.reduce((a, t) => a + t.bytes, 0)) + ')' : '')],
+  ];
+  if (fitNote) rows.push(['Image sizing', fitNote]);
+  el('summary').innerHTML = rows
+    .map(([k, v]) => '<tr><th>' + k + '</th><td class="n">' + v + '</td></tr>').join('');
+  const pct = Math.min(100, (used / space) * 100);
+  const bar = el('spaceBar');
+  bar.className = 'bar' + (pct > 97 ? ' over' : pct > 85 ? ' tight' : '');
+  bar.firstElementChild.style.width = pct.toFixed(1) + '%';
+  el('spaceText').textContent = bytes(used) + ' of ' + bytes(space) + ' used · ' +
+    bytes(space - used) + ' spare';
+  list('applied', report.applied);
+  list('skipped', report.skipped);
+  list('unmapped', report.unmapped);
+  el('report').style.display = '';
+}
+
+el('download').addEventListener('click', () => {
+  if (!state.result) return;
+  const base = state.save.name.replace(/(\.[^./]*)?$/, '');
+  const url = URL.createObjectURL(new Blob([state.result.file], { type: 'application/octet-stream' }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = base + '-' + state.result.name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+});
+
+</script>
+</body>
+</html>

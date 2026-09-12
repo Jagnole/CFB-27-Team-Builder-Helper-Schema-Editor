@@ -5,11 +5,49 @@
  */
 'use strict';
 
-const zlibHost = TBFile.zlibWeb();
-const inflateRaw = TBKitZip.inflateRawWeb();
-
 const el = (id) => document.getElementById(id);
 const state = { save: null, kit: null, result: null };
+
+/*
+ * This page needs tbfile.js, uniform.js and kitzip.js loaded from the same
+ * folder. Saving the page on its own, or moving it away from them, leaves
+ * every control inert — so say that out loud instead of doing nothing.
+ */
+const REQUIRED = [['TBFile', 'tbfile.js'], ['TBUniform', 'uniform.js'], ['TBKitZip', 'kitzip.js']];
+function bootCheck() {
+  const missing = REQUIRED.filter(([global]) => typeof window[global] === 'undefined');
+  const problems = [];
+  if (missing.length) {
+    problems.push('These files did not load: <code>' + missing.map(m => m[1]).join('</code>, <code>') +
+      '</code>. They have to sit in the same folder as this page. Downloading the whole ' +
+      '<code>tools/teambuilder-file/</code> folder fixes it — or use ' +
+      '<code>uniform-import-standalone.html</code>, which has everything in one file.');
+  }
+  if (typeof CompressionStream === 'undefined') {
+    problems.push('This browser has no <code>CompressionStream</code>, which the page needs to write ' +
+      'the save file. Chrome, Edge or a current Firefox will work.');
+  }
+  const banner = el('banner');
+  if (!problems.length) {
+    /* The notice is in the static HTML so it shows even when these scripts
+       never load; getting this far means it can go. */
+    banner.hidden = true;
+    return true;
+  }
+  banner.className = 'bad';
+  banner.innerHTML = '<b>This page cannot run here</b>' + problems.join('<br><br>');
+  for (const id of ['saveFile', 'kitFile', 'go']) el(id).disabled = true;
+  return false;
+}
+
+const ready = bootCheck();
+const zlibHost = ready ? TBFile.zlibWeb() : null;
+const inflateRaw = ready ? TBKitZip.inflateRawWeb() : null;
+
+/* Anything that escapes a handler should land somewhere the user can see. */
+window.addEventListener('error', (e) => setStatus('Unexpected error: ' + e.message, true));
+window.addEventListener('unhandledrejection', (e) => setStatus('Unexpected error: ' +
+  ((e.reason && e.reason.message) || e.reason), true));
 
 function setStatus(text, isError) {
   const s = el('status');
