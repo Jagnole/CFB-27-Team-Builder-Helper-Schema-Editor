@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Team Builder Uniform Importer</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #f6f7f9; --panel: #fff; --ink: #16181d; --muted: #5c6370;
+    --line: #d8dce3; --accent: #1c5fd6; --ok: #1a7f45; --warn: #8a5300; --bad: #b3261e;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #14161a; --panel: #1c1f25; --ink: #e8eaee; --muted: #a0a7b4;
+            --line: #2e333c; --accent: #6ba1ff; --ok: #5ed492; --warn: #e0b155; --bad: #ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: 24px 16px 48px; background: var(--bg); color: var(--ink);
+         font: 15px/1.5 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  main { max-width: 860px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+            padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+       margin: 0 0 12px; }
+  label { display: block; font-weight: 600; margin: 12px 0 4px; }
+  label:first-of-type { margin-top: 0; }
+  input[type=file] { width: 100%; }
+  input[type=text], input[type=number], select {
+    width: 100%; max-width: 320px; padding: 7px 9px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--bg); color: var(--ink); font: inherit;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  .row > div { flex: 1 1 220px; }
+  .hint { color: var(--muted); font-size: 13px; margin-top: 4px; }
+  button { font: 600 15px/1 inherit; padding: 11px 18px; border-radius: 8px; border: 1px solid transparent;
+           background: var(--accent); color: #fff; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: default; }
+  button.ghost { background: transparent; color: var(--accent); border-color: var(--line); }
+  #status { margin: 12px 0 0; font-weight: 600; }
+  #status.err { color: var(--bad); }
+  #report { display: none; }
+  .bar { height: 8px; border-radius: 4px; background: var(--line); overflow: hidden; margin: 6px 0 2px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); }
+  .bar.tight > i { background: var(--warn); }
+  .bar.over > i { background: var(--bad); }
+  ul { margin: 4px 0 0; padding-left: 18px; }
+  li { font-family: var(--mono); font-size: 12.5px; }
+  .plus li::marker { content: '+ '; color: var(--ok); }
+  .minus li::marker { content: '– '; color: var(--warn); }
+  .quest li::marker { content: '? '; color: var(--muted); }
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; }
+  table { border-collapse: collapse; font-size: 13.5px; width: 100%; }
+  td, th { text-align: left; padding: 3px 10px 3px 0; }
+  td.n { font-family: var(--mono); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Team Builder Uniform Importer</h1>
+  <p class="sub">Adds a uniform exported from cfbuniformcreator.com to a Team Builder save file
+  (<span class="n">TEAMBUILDER-00<i>n</i></span>) as an extra uniform, leaving the existing ones alone.
+  Everything happens in this page — no upload.</p>
+
+  <section>
+    <h2>Files</h2>
+    <label for="saveFile">Team Builder save file</label>
+    <input type="file" id="saveFile">
+    <div class="hint" id="saveInfo">Pick the TEAMBUILDER-00n file from your save folder.</div>
+
+    <label for="kitFile">Uniform creator export (.zip)</label>
+    <input type="file" id="kitFile" accept=".zip,application/zip">
+    <div class="hint" id="kitInfo">The archive with <span class="n">kit.json</span> and a <span class="n">textures/</span> folder.</div>
+  </section>
+
+  <section>
+    <h2>Options</h2>
+    <div class="row">
+      <div>
+        <label for="variantName">New uniform name</label>
+        <input type="text" id="variantName" placeholder="from kit.json">
+        <div class="hint">Letters and numbers only — it becomes part of an asset name.</div>
+      </div>
+      <div>
+        <label for="sourceVariant">Start from</label>
+        <select id="sourceVariant"><option value="">(load a save file first)</option></select>
+        <div class="hint">The existing uniform that is copied, then edited.</div>
+      </div>
+    </div>
+    <div class="row">
+      <div>
+        <label for="texMode">Baked textures</label>
+        <select id="texMode">
+          <option value="fit">Shrink to fit the save file</option>
+          <option value="asis">Embed at full size</option>
+          <option value="skip">Skip — recipe only</option>
+        </select>
+        <div class="hint">A save file has a fixed size, so large images may not fit.</div>
+      </div>
+      <div>
+        <label for="maxDim">Shrink limit (px)</label>
+        <input type="number" id="maxDim" value="1024" min="128" max="4096" step="128">
+        <div class="hint">Longest edge when shrinking.</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <button id="go" disabled>Build uniform</button>
+    <button id="download" class="ghost" style="display:none">Download save file</button>
+    <p id="status"></p>
+  </section>
+
+  <section id="report">
+    <h2>Result</h2>
+    <table id="summary"></table>
+    <div class="bar" id="spaceBar"><i></i></div>
+    <div class="hint" id="spaceText"></div>
+    <details open><summary>Written</summary><ul class="plus" id="applied"></ul></details>
+    <details><summary>Skipped</summary><ul class="minus" id="skipped"></ul></details>
+    <details><summary>Not imported yet</summary><ul class="quest" id="unmapped"></ul></details>
+  </section>
+</main>
+<script src="tbfile.js"></script>
+<script src="uniform.js"></script>
+<script src="kitzip.js"></script>
+<script src="uniform-import.js"></script>
+</body>
+</html>

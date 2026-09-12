@@ -46,6 +46,12 @@ runs at the browser layer, where it can.
   payload at all.
 - **Reset to loaded** — revert every edit back to exactly what was fetched,
   with one click.
+- **Team Builder save file tools** (`tools/teambuilder-file/`) — read and
+  edit a `TEAMBUILDER-00n` save file directly, and import a uniform
+  exported from cfbuniformcreator.com into it as an extra uniform. Includes
+  a drag-and-drop page, a Node CLI, and a written spec of the save format
+  in `tools/teambuilder-file/FORMAT.md`. The codec round-trips a real save
+  byte for byte; the uniform import has not been tested in game yet.
 - Runs entirely locally. Nothing is sent anywhere except EA's own servers
   (to fetch the team you already have open) and back to your own browser.
 
@@ -115,6 +121,9 @@ toptabs.js        Switches between the JSON Editor and Mask & Stripe Studio
                   tabs (kept as an external file — extension pages block
                   inline <script> tags by default)
 masks/            Bundled mask images used by Mask & Stripe Studio
+tools/
+  teambuilder-file/ Save-file codec, uniform importer page and CLI, plus
+                  FORMAT.md documenting the TEAMBUILDER-00n file format
 CHANGELOG.md      Version history for the editor
 ```
 
