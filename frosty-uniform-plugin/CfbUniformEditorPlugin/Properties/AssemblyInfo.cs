@@ -1,4 +1,5 @@
 ﻿using CfbUniformEditorPlugin;
+using CfbUniformEditorPlugin.TeamCreator;
 using FrostySdk;
 using Frosty.Core.Attributes;
 using System.Reflection;
@@ -27,3 +28,6 @@ using System.Windows;
 // UniformSchema.RootEbxTypeName is a real Ebx type (UniformVisuals), confirmed from the profile
 // SDK's IL metadata — see UniformSchema.cs and docs/ebx-uniform-mapping.md.
 [assembly: RegisterAssetDefinition(UniformSchema.RootEbxTypeName, typeof(UniformAssetDefinition))]
+
+// Team Creator: a standalone tool tab (not tied to any one open asset), see docs/team-creator.md.
+[assembly: RegisterTabExtension(typeof(TeamCreatorTabExtension))]

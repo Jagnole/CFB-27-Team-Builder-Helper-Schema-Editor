@@ -44,9 +44,11 @@ frosty-uniform-plugin/
     UniformAssetDefinition.cs    hooks the editor into Frosty's asset system
     FrostyUniformEditor.cs       docked editor: property grid + live-preview viewport
     UniformPreviewScreen.cs      placeholder render screen (see docs/ebx-uniform-mapping.md)
+    TeamCreator/                 tool tab: automate team-identity fields + logo/UI texture import
     Themes/Generic.xaml          WPF control template for the editor
   CfbUniformEditorPlugin.sln    solution containing just the plugin project
   docs/ebx-uniform-mapping.md  confirmed uniform-asset field mapping (from a real profile DLL)
+  docs/team-creator.md         Team Creator tool: what it automates, what you still supply by hand
 ```
 
 ## Building (Windows only)
