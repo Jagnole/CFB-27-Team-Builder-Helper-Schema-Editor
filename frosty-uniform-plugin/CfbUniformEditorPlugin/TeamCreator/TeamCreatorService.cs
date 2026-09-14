@@ -91,12 +91,22 @@ namespace CfbUniformEditorPlugin.TeamCreator
 
         public void ReplaceTeamAssets(TeamCreatorRequest request, Action<string> log)
         {
-            if (!EditTeamVisuals(request, log))
-                return;
+            // Top-level safety net: anything unexpected here becomes a log line instead of an
+            // unhandled exception, which Frosty's own top-level handler shows as a bare, useless
+            // "Object reference not set..." dialog with no indication of what actually broke.
+            try
+            {
+                if (!EditTeamVisuals(request, log))
+                    return;
 
-            ImportTextures(request, log);
+                ImportTextures(request, log);
 
-            log("--- Done. Review the changes in the Data Explorer, then Save/Export Mod from Frosty as usual. ---");
+                log("--- Done. Review the changes in the Data Explorer, then Save/Export Mod from Frosty as usual. ---");
+            }
+            catch (Exception ex)
+            {
+                log($"Unexpected error: {ex.Message}");
+            }
         }
 
         private bool EditTeamVisuals(TeamCreatorRequest request, Action<string> log)
@@ -108,17 +118,19 @@ namespace CfbUniformEditorPlugin.TeamCreator
                 return false;
             }
 
-            EbxAsset asset = App.AssetManager.GetEbx(entry);
-            dynamic root = asset.RootObject;
-
             try
             {
+                EbxAsset asset = App.AssetManager.GetEbx(entry);
+                dynamic root = asset.RootObject;
+
                 if (!string.IsNullOrEmpty(request.TeamName))
                     root.AssetName = request.TeamName;
                 if (!string.IsNullOrEmpty(request.PrefixName))
                     root.PrefixName = request.PrefixName;
                 if (!string.IsNullOrEmpty(request.BrandName))
                     root.BrandName = request.BrandName;
+
+                App.AssetManager.ModifyEbx(entry.Name, asset);
             }
             catch (Exception ex)
             {
@@ -129,7 +141,6 @@ namespace CfbUniformEditorPlugin.TeamCreator
                 return false;
             }
 
-            App.AssetManager.ModifyEbx(entry.Name, asset);
             log($"Updated TeamVisuals fields on '{entry.Name}'.");
             return true;
         }
@@ -142,7 +153,16 @@ namespace CfbUniformEditorPlugin.TeamCreator
                 string filePath = kv.Value;
                 string assetPath = slot.ResolvePath(request.BaseTeamTextureCode);
 
-                string error = TextureImportHelper.Import(assetPath, filePath);
+                string error;
+                try
+                {
+                    error = TextureImportHelper.Import(assetPath, filePath);
+                }
+                catch (Exception ex)
+                {
+                    error = $"Unexpected error: {ex.Message}";
+                }
+
                 if (error != null)
                     log($"[{slot.FriendlyName}] FAILED: {error}");
                 else

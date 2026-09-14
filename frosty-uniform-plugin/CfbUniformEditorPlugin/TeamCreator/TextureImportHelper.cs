@@ -134,7 +134,12 @@ namespace CfbUniformEditorPlugin.TeamCreator
                     }
 
                     ResAssetEntry liveResEntry = App.AssetManager.GetResEntry(resourceAssetPath);
+                    if (liveResEntry == null)
+                        return $"'{resourceAssetPath}' resolved earlier but disappeared before the write step -- try again.";
+
                     ChunkAssetEntry chunkEntry = App.AssetManager.GetChunkEntry(textureAsset.ChunkId);
+                    if (chunkEntry == null)
+                        return $"'{resourceAssetPath}' has no chunk entry for its ChunkId ({textureAsset.ChunkId}) -- this slot may not be a plain on-disk texture in this build, or its data isn't loaded.";
 
                     byte[] buffer = new byte[reader.Length - reader.Position];
                     reader.Read(buffer, 0, (int)(reader.Length - reader.Position));
@@ -170,6 +175,14 @@ namespace CfbUniformEditorPlugin.TeamCreator
                 }
 
                 return null;
+            }
+            catch (Exception ex)
+            {
+                // Whatever went wrong (native marshaling, an unhandled profile branch, etc.) -- turn
+                // it into a per-slot message instead of letting it bubble up as an unhandled
+                // exception, which Frosty's own top-level handler would show as a bare, useless
+                // "Object reference not set..." dialog with no indication of which slot or why.
+                return $"Unexpected error importing into '{resourceAssetPath}': {ex.Message}";
             }
             finally
             {

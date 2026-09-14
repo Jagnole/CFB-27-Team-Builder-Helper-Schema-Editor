@@ -123,10 +123,18 @@ namespace CfbUniformEditorPlugin.TeamCreator
             if (baseTeamVisualsPathBox != null)
                 baseTeamVisualsPathBox.Text = entry.Name;
 
-            service.ReadCurrentIdentity(entry, out string teamName, out string prefixName, out string brandName);
-            if (teamNameBox != null) teamNameBox.Text = teamName;
-            if (prefixNameBox != null) prefixNameBox.Text = prefixName;
-            if (brandNameBox != null) brandNameBox.Text = brandName;
+            try
+            {
+                service.ReadCurrentIdentity(entry, out string teamName, out string prefixName, out string brandName);
+                if (teamNameBox != null) teamNameBox.Text = teamName;
+                if (prefixNameBox != null) prefixNameBox.Text = prefixName;
+                if (brandNameBox != null) brandNameBox.Text = brandName;
+            }
+            catch (Exception ex)
+            {
+                Log($"Loaded the path, but couldn't read current identity fields: {ex.Message}. You can still fill them in by hand.");
+                return;
+            }
 
             Log($"Loaded '{entry.DisplayName}'. Current identity fields are shown below -- edit whichever you want to change, pick or browse a texture-suffix code, choose replacement images, then click Replace Team Assets.");
         }
