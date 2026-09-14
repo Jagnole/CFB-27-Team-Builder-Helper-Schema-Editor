@@ -6,10 +6,13 @@ using System.Windows.Controls;
 using Frosty.Controls;
 using Frosty.Core;
 using Frosty.Core.Controls;
+using FrostySdk.Managers.Entries;
 
 namespace CfbUniformEditorPlugin.TeamCreator
 {
-    [TemplatePart(Name = PART_BaseTeamCode, Type = typeof(TextBox))]
+    [TemplatePart(Name = PART_BaseTeamPicker, Type = typeof(ComboBox))]
+    [TemplatePart(Name = PART_LoadTeamButton, Type = typeof(Button))]
+    [TemplatePart(Name = PART_BaseTeamCode, Type = typeof(ComboBox))]
     [TemplatePart(Name = PART_BaseTeamVisualsPath, Type = typeof(TextBox))]
     [TemplatePart(Name = PART_TeamName, Type = typeof(TextBox))]
     [TemplatePart(Name = PART_PrefixName, Type = typeof(TextBox))]
@@ -19,6 +22,8 @@ namespace CfbUniformEditorPlugin.TeamCreator
     [TemplatePart(Name = PART_Log, Type = typeof(TextBox))]
     public class TeamCreatorTabItem : FrostyTabItem
     {
+        private const string PART_BaseTeamPicker = "PART_BaseTeamPicker";
+        private const string PART_LoadTeamButton = "PART_LoadTeamButton";
         private const string PART_BaseTeamCode = "PART_BaseTeamCode";
         private const string PART_BaseTeamVisualsPath = "PART_BaseTeamVisualsPath";
         private const string PART_TeamName = "PART_TeamName";
@@ -28,7 +33,9 @@ namespace CfbUniformEditorPlugin.TeamCreator
         private const string PART_CreateButton = "PART_CreateButton";
         private const string PART_Log = "PART_Log";
 
-        private TextBox baseTeamCodeBox;
+        private ComboBox baseTeamPicker;
+        private Button loadTeamButton;
+        private ComboBox baseTeamCodeBox;
         private TextBox baseTeamVisualsPathBox;
         private TextBox teamNameBox;
         private TextBox prefixNameBox;
@@ -49,7 +56,9 @@ namespace CfbUniformEditorPlugin.TeamCreator
         {
             base.OnApplyTemplate();
 
-            baseTeamCodeBox = GetTemplateChild(PART_BaseTeamCode) as TextBox;
+            baseTeamPicker = GetTemplateChild(PART_BaseTeamPicker) as ComboBox;
+            loadTeamButton = GetTemplateChild(PART_LoadTeamButton) as Button;
+            baseTeamCodeBox = GetTemplateChild(PART_BaseTeamCode) as ComboBox;
             baseTeamVisualsPathBox = GetTemplateChild(PART_BaseTeamVisualsPath) as TextBox;
             teamNameBox = GetTemplateChild(PART_TeamName) as TextBox;
             prefixNameBox = GetTemplateChild(PART_PrefixName) as TextBox;
@@ -59,9 +68,67 @@ namespace CfbUniformEditorPlugin.TeamCreator
             logBox = GetTemplateChild(PART_Log) as TextBox;
 
             BuildTextureSlotRows();
+            PopulateBaseTeamPicker();
+            PopulateTextureCodeCandidates();
 
+            if (loadTeamButton != null)
+                loadTeamButton.Click += LoadTeamButton_Click;
             if (createButton != null)
                 createButton.Click += CreateButton_Click;
+        }
+
+        private void PopulateBaseTeamPicker()
+        {
+            if (baseTeamPicker == null)
+                return;
+
+            try
+            {
+                List<EbxAssetEntry> teams = service.EnumerateBaseTeams();
+                baseTeamPicker.DisplayMemberPath = "DisplayName";
+                baseTeamPicker.ItemsSource = teams;
+                if (teams.Count == 0)
+                    Log("No TeamVisuals assets found -- is a CollegeFootball27 install actually loaded?");
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not list existing teams: {ex.Message}");
+            }
+        }
+
+        private void PopulateTextureCodeCandidates()
+        {
+            if (baseTeamCodeBox == null)
+                return;
+
+            try
+            {
+                baseTeamCodeBox.ItemsSource = service.EnumerateTextureCodeCandidates();
+            }
+            catch (Exception ex)
+            {
+                Log($"Could not scan for texture-suffix codes: {ex.Message}");
+            }
+        }
+
+        private void LoadTeamButton_Click(object sender, RoutedEventArgs e)
+        {
+            EbxAssetEntry entry = baseTeamPicker?.SelectedItem as EbxAssetEntry;
+            if (entry == null)
+            {
+                Log("Pick a team from the list above first.");
+                return;
+            }
+
+            if (baseTeamVisualsPathBox != null)
+                baseTeamVisualsPathBox.Text = entry.Name;
+
+            service.ReadCurrentIdentity(entry, out string teamName, out string prefixName, out string brandName);
+            if (teamNameBox != null) teamNameBox.Text = teamName;
+            if (prefixNameBox != null) prefixNameBox.Text = prefixName;
+            if (brandNameBox != null) brandNameBox.Text = brandName;
+
+            Log($"Loaded '{entry.DisplayName}'. Current identity fields are shown below -- edit whichever you want to change, pick or browse a texture-suffix code, choose replacement images, then click Replace Team Assets.");
         }
 
         private void BuildTextureSlotRows()
@@ -134,11 +201,11 @@ namespace CfbUniformEditorPlugin.TeamCreator
 
             if (string.IsNullOrEmpty(baseTeamCode) || string.IsNullOrEmpty(baseTeamVisualsPath))
             {
-                Log("Enter both the base team's texture code and its TeamVisuals asset path before creating a team.");
+                Log("Pick a team to replace (and Load Team) and choose a texture-suffix code before replacing anything.");
                 return;
             }
 
-            Log($"--- Creating team from base '{baseTeamCode}' ---");
+            Log($"--- Replacing assets on '{baseTeamVisualsPath}' (texture code '{baseTeamCode}') ---");
 
             TeamCreatorRequest request = new TeamCreatorRequest
             {
@@ -150,7 +217,7 @@ namespace CfbUniformEditorPlugin.TeamCreator
                 TextureFiles = selectedFiles.ToDictionary(kv => kv.Key, kv => kv.Value),
             };
 
-            service.CreateTeam(request, Log);
+            service.ReplaceTeamAssets(request, Log);
         }
     }
 }

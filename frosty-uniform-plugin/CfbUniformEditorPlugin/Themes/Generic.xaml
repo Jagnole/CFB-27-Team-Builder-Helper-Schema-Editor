@@ -39,7 +39,7 @@
         </Setter>
     </Style>
 
-    <!-- TeamCreatorTabItem: form on top (base team, brand fields, texture slots), log at the bottom -->
+    <!-- TeamCreatorTabItem: pick+load an existing team, then replace its identity fields/texture slots; log at the bottom -->
     <Style TargetType="{x:Type tc:TeamCreatorTabItem}">
         <Setter Property="Template">
             <Setter.Value>
@@ -52,13 +52,23 @@
 
                         <ScrollViewer Grid.Row="0" VerticalScrollBarVisibility="Auto" Padding="10">
                             <StackPanel>
-                                <TextBlock Text="Base team" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
-                                <TextBlock Text="Texture-suffix code (e.g. sanjosestate) -- find this from any existing tmlg_ncaa_primary_&lt;code&gt; asset name." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap"/>
-                                <TextBox x:Name="PART_BaseTeamCode" Margin="0,2,0,8"/>
-                                <TextBlock Text="TeamVisuals asset path (e.g. content/footballcharacter/teamvisuals/sanjos_teamvisuals) -- right-click it in the Data Explorer and Copy Path." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap"/>
-                                <TextBox x:Name="PART_BaseTeamVisualsPath" Margin="0,2,0,12"/>
+                                <TextBlock Text="1. Pick a team to replace" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
+                                <TextBlock Text="The game can't add new teams -- every custom team is really one of these existing teams with its assets replaced. Pick one, then Load Team to pull in what it currently has." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,4"/>
+                                <Grid Margin="0,2,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <ComboBox x:Name="PART_BaseTeamPicker" Grid.Column="0" Margin="0,0,4,0"/>
+                                    <Button x:Name="PART_LoadTeamButton" Grid.Column="1" Content="Load Team" Padding="10,2"/>
+                                </Grid>
+                                <TextBlock Text="TeamVisuals asset path (filled in by Load Team above)." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap"/>
+                                <TextBox x:Name="PART_BaseTeamVisualsPath" IsReadOnly="True" Margin="0,2,0,8"/>
+                                <TextBlock Text="Texture-suffix code (e.g. sanjosestate) -- pick from the list (scraped from existing tmlg_ncaa_primary_&lt;code&gt; assets) or type your own if it's not there. Not guaranteed to match the team above -- see docs/team-creator.md." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap"/>
+                                <ComboBox x:Name="PART_BaseTeamCode" IsEditable="True" IsTextSearchEnabled="True" Margin="0,2,0,12"/>
 
-                                <TextBlock Text="Team identity" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
+                                <TextBlock Text="2. Replace identity fields" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
+                                <TextBlock Text="Loaded from the team above -- edit only the ones you want to change; leave the rest as-is." Foreground="{StaticResource FontColor}" Opacity="0.7" TextWrapping="Wrap" Margin="0,0,0,4"/>
                                 <TextBlock Text="Team name (AssetName)" Foreground="{StaticResource FontColor}" Opacity="0.7"/>
                                 <TextBox x:Name="PART_TeamName" Margin="0,2,0,8"/>
                                 <TextBlock Text="Prefix name (PrefixName)" Foreground="{StaticResource FontColor}" Opacity="0.7"/>
@@ -66,11 +76,11 @@
                                 <TextBlock Text="Brand name (BrandName)" Foreground="{StaticResource FontColor}" Opacity="0.7"/>
                                 <TextBox x:Name="PART_BrandName" Margin="0,2,0,12"/>
 
-                                <TextBlock Text="Logos &amp; UI art" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
-                                <TextBlock Text="Leave any slot blank to skip it." Foreground="{StaticResource FontColor}" Opacity="0.7" Margin="0,0,0,4"/>
+                                <TextBlock Text="3. Replace logos &amp; UI art" FontWeight="Bold" Margin="0,0,0,4" Foreground="{StaticResource FontColor}"/>
+                                <TextBlock Text="Leave any slot blank to keep the base team's current image." Foreground="{StaticResource FontColor}" Opacity="0.7" Margin="0,0,0,4"/>
                                 <StackPanel x:Name="PART_TextureSlotsPanel"/>
 
-                                <Button x:Name="PART_CreateButton" Content="Create Team" Margin="0,14,0,0" Padding="12,6" HorizontalAlignment="Left"/>
+                                <Button x:Name="PART_CreateButton" Content="Replace Team Assets" Margin="0,14,0,0" Padding="12,6" HorizontalAlignment="Left"/>
                             </StackPanel>
                         </ScrollViewer>
 

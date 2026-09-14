@@ -1,9 +1,19 @@
-# Team Creator tool tab
+# Team Replacer tool tab
 
 A standalone tool panel (via `RegisterTabExtension`, not tied to any one open
 asset) added to `CfbUniformEditorPlugin`, aimed at automating the tedious part
-of building a custom team: editing team-identity fields and re-importing
-~26 logo/UI texture slots, without hand-duplicating each asset one at a time.
+of building a custom team.
+
+**This is a replacement tool, not a creation tool.** The game has no "add a
+team" path — every custom team a player can actually load in CFB 27 is one of
+the game's existing teams with its assets overwritten. So the tool's actual
+job, and the flow it's built around, is: pick one of the existing teams
+(`1. Pick a team to replace`), load what it currently has, then replace
+whichever identity fields and logo/UI texture slots (~26 of them) you want to
+change — never duplicate-and-rename, always edit in place. The internal
+class/type names still say `TeamCreator*` (renaming them isn't worth the
+churn), but the UI and the workflow are "replace an existing team," not
+"create a new one."
 
 **This does not write `.fbmod` files itself.** It runs inside Frosty/MMC
 Editor and drives the tool's own real, already-working `AssetManager`/texture
@@ -31,22 +41,33 @@ version relevant to this tool:
   deliberately left out here (different base-asset choice per team, and a
   separate decision from "make my own team").
 
-## Two things you have to supply by hand (v1 limitation)
+## How base-team lookup works now
 
-The tool can't auto-discover these from inside Frosty (or at least, this
-version doesn't try to), so you look them up once per base team:
+`1. Pick a team to replace` is a dropdown populated by
+`App.AssetManager.EnumerateEbx(type: "TeamVisuals")` — every real
+`TeamVisuals` asset the loaded profile has, no manual Data Explorer search
+needed. Hitting **Load Team**:
 
-1. **Texture-suffix code** (e.g. `sanjosestate`) — search the Data Explorer
-   for any `tmlg_ncaa_primary_*` asset and copy the suffix after the last
-   underscore.
-2. **`TeamVisuals` asset path** — search for `teamvisuals` and copy the exact
-   path of your base team's instance (right-click → Copy Path).
+- fills in the `TeamVisuals` asset path box (read-only, just for visibility/
+  debugging — it's driven by the dropdown, not typed),
+- reads that team's *current* `AssetName`/`PrefixName`/`BrandName` values via
+  `TeamCreatorService.ReadCurrentIdentity` and pre-fills the identity boxes
+  with them, so you're editing what's actually there instead of starting
+  blank,
+- does **not** auto-fill the texture-suffix code (see below).
 
-These are **not guaranteed to derive from each other** — a team's `TeamVisuals`
-short name and its texture-suffix code can differ (e.g. `sanjos` vs.
-`sanjosestate` in the reference mod) — hence two separate fields rather than
-one "pick a team" dropdown. A future version could build a proper lookup
-once real team data confirms the relationship.
+**Texture-suffix code is still not reliably derivable.** `TeamCreatorService.
+EnumerateTextureCodeCandidates()` scans every existing `tmlg_ncaa_primary_*`
+asset and offers the suffixes as a pick-list (an editable `ComboBox`, so you
+can also just type one that isn't in the list), which beats hand-searching
+the Data Explorer — but it's still a **separate pick from the team dropdown**,
+not a derived value. A team's `TeamVisuals` short name and its texture-suffix
+code are confirmed to sometimes differ (e.g. `sanjos` vs. `sanjosestate` in
+the reference mod), so there's no reliable way to guess the right one from
+the `TeamVisuals` selection alone yet — cross-check the code you pick against
+one of that base team's own logos in the Data Explorer before importing
+anything. A future version could build a real lookup once more real team data
+confirms the relationship.
 
 ## Field-name risk
 
