@@ -6,6 +6,7 @@ using Frosty.Core.Viewport;
 using FrostySdk;
 using FrostySdk.IO;
 using FrostySdk.Managers;
+using FrostySdk.Managers.Entries;
 using FrostySdk.Resources;
 
 namespace CfbUniformEditorPlugin.TeamCreator

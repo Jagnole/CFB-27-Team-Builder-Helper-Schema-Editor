@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Frosty.Core;
 using FrostySdk.IO;
 using FrostySdk.Managers;
+using FrostySdk.Managers.Entries;
 
 namespace CfbUniformEditorPlugin.TeamCreator
 {

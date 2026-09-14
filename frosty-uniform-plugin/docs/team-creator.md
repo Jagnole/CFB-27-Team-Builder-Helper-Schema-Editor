@@ -85,3 +85,14 @@ Known risk areas, in rough order of likelihood of causing a first-try failure:
 If import fails on a specific slot, the error message names the slot and
 what didn't match — that's the starting point for fixing it, not a byte-level
 mystery like the `.fbmod` encryption was.
+
+## Confirmed namespace divergence from the public source
+
+`EbxAssetEntry`, `ResAssetEntry`, and `ChunkAssetEntry` live in
+`FrostySdk.Managers.Entries` in this MMC build's actual `FrostySdk.dll` —
+one namespace level deeper than in the public `1.0.6.3` source
+(`FrostySdk.Managers`), confirmed directly from the real DLL's IL metadata.
+`AssetManager`, `Texture`/`TextureType`/`TextureFlags`, `EbxAsset`,
+`NativeReader`, `ProfilesLibrary`, and `ILogger` are all still exactly where
+the public source has them — this is the one class family that moved.
+
