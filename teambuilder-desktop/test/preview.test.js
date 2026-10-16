@@ -144,6 +144,7 @@ test('every brand logo in the catalog has a preview', () => {
       assert.ok(Object.keys(e.regions).length && Object.keys(e.regions).every((k) => ['R', 'G', 'B'].includes(k)), decal.label);
     } else {
       assert.match(e.file, /^[A-Za-z0-9_-]+\.png$/);
+      assert.ok(e.shade || e.mask, `${decal.label} can be recolored`);
       assert.ok(fs.existsSync(path.join(dir, e.file)), e.file);
     }
   }

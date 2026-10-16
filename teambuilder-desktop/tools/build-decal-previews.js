@@ -9,7 +9,10 @@
 //     (preview_assets/manifest.json + vendor_previews.zip). These are the full
 //     512x512 decal squeezed to 110x70, so the app draws them back at square.
 //     Most are R/G/B masks; a few (the metallic "Diamond" decals) are full-color
-//     art and are shown as they are.
+//     gold art. Those are stored as a grayscale shading map (brightness
+//     normalised so the bright metal reaches white), which the app multiplies
+//     by the logo's main color. The art keeps its shine and dark edge in
+//     whatever color the logo is set to.
 // The index maps each decal's color texture name (lower case) to its preview.
 const fs = require('fs');
 const path = require('path');
@@ -63,6 +66,22 @@ function png(rgba, w, h) {
   return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', zlib.deflateSync(rows, { level: 9 })), chunk('IEND', Buffer.alloc(0))]);
 }
 
+// Full-color art -> grayscale shading map with alpha kept.
+function shadeMap(rgba) {
+  const luma = [];
+  for (let i = 0; i < rgba.length; i += 4) {
+    if (rgba[i + 3] > 200) luma.push(0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]);
+  }
+  luma.sort((a, b) => a - b);
+  const bright = luma[Math.floor(luma.length * 0.95)] || 255; // 95th percentile becomes white
+  const out = Buffer.from(rgba);
+  for (let i = 0; i < out.length; i += 4) {
+    const l = Math.min(255, Math.round(((0.299 * rgba[i] + 0.587 * rgba[i + 1] + 0.114 * rgba[i + 2]) * 255) / bright));
+    out[i] = out[i + 1] = out[i + 2] = l;
+  }
+  return out;
+}
+
 // A tint mask is made of pure R/G/B areas; full-color art is not.
 function isMask(rgba) {
   let opaque = 0;
@@ -94,12 +113,13 @@ for (const decal of data.catalog.decals) {
     const rgba = fs.readFileSync(path.join(vendorDir, raster.entry));
     if (rgba.length !== W * H * 4) throw new Error(`${raster.entry}: unexpected size ${rgba.length}`);
     const file = `${raster.id}.png`;
-    fs.writeFileSync(path.join(outDir, file), png(rgba, W, H));
-    index[key] = { type: 'image', file, mask: isMask(rgba) };
+    const mask = isMask(rgba);
+    fs.writeFileSync(path.join(outDir, file), png(mask ? rgba : shadeMap(rgba), W, H));
+    index[key] = mask ? { type: 'image', file, mask: true } : { type: 'image', file, shade: true };
     continue;
   }
   console.warn(`no preview for ${decal.label}`);
 }
 fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(index));
-const counts = Object.values(index).reduce((a, e) => { const k = e.type + (e.mask === false ? ' (art)' : ''); a[k] = (a[k] || 0) + 1; return a; }, {});
+const counts = Object.values(index).reduce((a, e) => { const k = e.type + (e.shade ? ' (shaded art)' : ''); a[k] = (a[k] || 0) + 1; return a; }, {});
 console.log(`${Object.keys(index).length} of ${data.catalog.decals.length} decals:`, counts);

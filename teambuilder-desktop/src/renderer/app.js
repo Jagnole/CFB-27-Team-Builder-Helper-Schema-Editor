@@ -195,26 +195,88 @@
       teamChips ? teamColorChips(commit) : h('span'), wrap, text);
   }
 
-  // Datalist values must be unique, so repeated labels get their asset name appended.
+  // Option labels must be unique, so repeated labels get their asset name appended.
   function pickerOptions(list, labelOf, idOf) {
     const counts = {};
     list.forEach((e) => { const l = labelOf(e); counts[l] = (counts[l] || 0) + 1; });
     return list.map((e) => ({ value: counts[labelOf(e)] > 1 ? `${labelOf(e)} · ${idOf(e)}` : labelOf(e), entry: e }));
   }
 
+  // Searchable dropdown. Drawn by the app rather than a <datalist>, whose
+  // built-in popup in Electron shows a capped list that won't scroll.
   function searchPicker(id, options, currentLabel, placeholder, onPick) {
-    const listId = `${id}-list`;
-    const input = h('input', { class: 'input', list: listId, placeholder, value: '' });
-    input.addEventListener('change', () => {
-      const hit = options.find((o) => o.value === input.value);
-      if (!hit) { if (input.value) toast(`"${input.value}" isn't in the list. Pick one of the suggestions.`, 'err'); return; }
+    const input = h('input', { class: 'input', placeholder, value: '', spellcheck: false, autocomplete: 'off', role: 'combobox', 'aria-expanded': 'false', 'aria-controls': `${id}-list` });
+    const list = h('div', { class: 'picker-list', id: `${id}-list`, role: 'listbox', hidden: true });
+    const count = h('div', { class: 'picker-count' });
+    let shown = [];
+    let active = -1;
+
+    const setActive = (i, scroll) => {
+      const rows = list.querySelectorAll('.picker-option');
+      if (rows[active]) rows[active].classList.remove('active');
+      active = i;
+      if (rows[active]) {
+        rows[active].classList.add('active');
+        if (scroll) rows[active].scrollIntoView({ block: 'nearest' });
+      }
+    };
+    const render = () => {
+      const words = input.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+      shown = options.filter((o) => words.every((w) => o.value.toLowerCase().includes(w)));
+      list.replaceChildren(...shown.map((o, i) => h('div', {
+        class: 'picker-option' + (o.value === currentLabel ? ' current' : ''),
+        role: 'option',
+        onmousedown: (e) => { e.preventDefault(); pick(o); }, // before the input's blur closes the list
+        onmousemove: () => { if (active !== i) setActive(i, false); },
+      }, h('span', { text: o.value }), o.value === currentLabel ? h('span', { class: 'picker-tag', text: 'Current' }) : null)));
+      if (!shown.length) list.appendChild(h('div', { class: 'picker-empty', text: 'No matches. Try a school name or a year.' }));
+      count.textContent = words.length ? `${shown.length} of ${options.length} match` : `${options.length} options`;
+      active = -1;
+      const cur = words.length ? 0 : shown.findIndex((o) => o.value === currentLabel);
+      setActive(cur >= 0 ? cur : 0, true);
+    };
+    const open = () => {
+      if (!list.hidden) return;
+      list.hidden = false;
+      input.setAttribute('aria-expanded', 'true');
+      render();
+    };
+    const close = () => {
+      list.hidden = true;
+      input.setAttribute('aria-expanded', 'false');
+    };
+    function pick(o) {
       input.value = '';
-      onPick(hit.entry);
+      close();
+      input.blur();
+      onPick(o.entry);
+    }
+
+    input.addEventListener('focus', open);
+    input.addEventListener('click', open);
+    input.addEventListener('input', () => { open(); render(); });
+    input.addEventListener('blur', close);
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        open();
+        if (shown.length) setActive((active + (e.key === 'ArrowDown' ? 1 : -1) + shown.length) % shown.length, true);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (!list.hidden && shown[active]) pick(shown[active]);
+      } else if (e.key === 'Escape') {
+        close();
+      }
     });
+    const toggle = h('button', {
+      class: 'picker-toggle', type: 'button', title: 'Show all', 'aria-label': 'Show all options',
+      onmousedown: (e) => { e.preventDefault(); if (list.hidden) input.focus(); else close(); },
+    }, '▾');
+
     return h('div', null,
       h('div', { class: 'small muted', style: 'margin-bottom:6px' }, 'Current: ', h('b', { text: currentLabel || '(none)' })),
-      input,
-      h('datalist', { id: listId }, options.map((o) => h('option', { value: o.value }))));
+      h('div', { class: 'picker' }, input, toggle, list),
+      count);
   }
 
   // ---------- Start ----------
@@ -663,8 +725,36 @@
       svg.appendChild(g);
       return svg;
     }
-    return h('img', { class: 'decal-art', src: `../assets/decal-previews/${e.file}`, alt: '' });
+    const src = `../assets/decal-previews/${e.file}`;
+    if (!e.shade) return h('img', { class: 'decal-art', src, alt: '' });
+    // Shaded metallic art: grayscale x the logo's main color, so the shine
+    // and dark edge show in whatever color the logo is set to.
+    const rgb = P.hexToRgb(colors.R) || [255, 255, 255];
+    const [r, g, b] = rgb.map((c) => (c / 255).toFixed(4));
+    const id = `decal-tint-${++decalArt.seq}`;
+    const svg = document.createElementNS(SVG_NS, 'svg');
+    svg.setAttribute('viewBox', '0 0 1 1');
+    svg.setAttribute('preserveAspectRatio', 'none'); // stored squeezed to 110x70; drawn square again
+    svg.setAttribute('class', 'decal-art');
+    const filter = document.createElementNS(SVG_NS, 'filter');
+    filter.setAttribute('id', id);
+    filter.setAttribute('color-interpolation-filters', 'sRGB');
+    const matrix = document.createElementNS(SVG_NS, 'feColorMatrix');
+    matrix.setAttribute('type', 'matrix');
+    matrix.setAttribute('values', `${r} 0 0 0 0  0 ${g} 0 0 0  0 0 ${b} 0 0  0 0 0 1 0`);
+    filter.appendChild(matrix);
+    const defs = document.createElementNS(SVG_NS, 'defs');
+    defs.appendChild(filter);
+    const image = document.createElementNS(SVG_NS, 'image');
+    image.setAttribute('href', src);
+    image.setAttribute('width', '1');
+    image.setAttribute('height', '1');
+    image.setAttribute('preserveAspectRatio', 'none');
+    image.setAttribute('filter', `url(#${id})`);
+    svg.append(defs, image);
+    return svg;
   }
+  decalArt.seq = 0;
 
   function brandStudio(v, origVariant) {
     const d = state.data;
@@ -696,7 +786,7 @@
         stage(decal, pieces[0], 'big'),
         h('div', { class: 'decal-minis' }, pieces.map((piece) => h('div', null, stage(decal, piece, 'mini'), h('div', { class: 'small muted', text: piece.label })))));
       const e = decal && decalPreviews.index && decalPreviews.index[decalKey(decal.col)];
-      const how = e && e.type === 'image' ? 'metallic art, shown in its own colors' : 'shown in each piece\'s logo colors';
+      const how = e && e.shade ? 'metallic, tinted with each piece\'s main logo color' : 'shown in each piece\'s logo colors';
       caption.textContent = hover
         ? `Previewing ${hover.label} (${how}). Click it to use it.`
         : decal ? `${decal.label} · ${how}.` : 'No brand logo on this uniform.';

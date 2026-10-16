@@ -184,6 +184,7 @@ real team.
   `preview_assets` folder.
 - `src/assets/decal-previews/`: brand logo previews. 15 are vector outlines
   from extension v0.76; their red, green and blue areas take the logo's three
-  colors. The two metallic Diamond decals use the Offline Editor's art, shown
-  in their own colors. `tools/build-decal-previews.js` regenerates them.
+  colors. The two metallic Diamond decals use the Offline Editor's art as a
+  grayscale shading map, tinted with the logo's main color, so they keep
+  their shine in any color. `tools/build-decal-previews.js` regenerates them.
 - `src/renderer/`: the UI. Plain HTML, CSS and JS, with no framework.
