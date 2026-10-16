@@ -114,6 +114,42 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .tab { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); cursor: pointer; }
 .tab.active { background: var(--accent); color: #1a0d00; border-color: var(--accent); font-weight: 600; }
 
+/* jersey numbers studio */
+.numbers-studio { margin-bottom: 16px; }
+.numbers-studio .card-head { margin-bottom: 4px; }
+.numbers-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 28px; align-items: start; }
+.current-font { display: flex; flex-direction: column; gap: 2px; padding: 10px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); }
+.current-font b { font-size: 15px; }
+.preview-panel { position: sticky; top: 0; display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: var(--radius); background: var(--panel); border: 1px solid var(--line); }
+.preview-canvas { width: 100%; aspect-ratio: 320 / 250; display: block; border-radius: 8px; border: 1px solid var(--line); background: #0b1a2d; }
+.preview-caption { font-size: 12px; color: var(--muted); min-height: 16px; }
+.preview-number { width: 64px; text-align: center; font-size: 18px; font-weight: 700; padding: 4px 6px; }
+.preview-options { display: flex; flex-direction: column; gap: 8px; }
+.preview-options label { display: grid; grid-template-columns: 90px auto 1fr; gap: 10px; align-items: center; color: var(--muted); }
+.preview-options select { width: auto; grid-column: 2 / 4; }
+.preview-options .btn { justify-self: start; }
+.font-browser { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.font-browser .hint { margin: 6px 0 10px; color: var(--muted); font-size: 12px; }
+.font-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px;
+  max-height: 540px; overflow-y: auto; overflow-x: hidden; margin-top: 10px; padding: 2px 4px 2px 2px;
+}
+.font-tile {
+  position: relative; display: flex; flex-direction: column; gap: 6px; padding: 6px; text-align: left; min-width: 0;
+  border-radius: 8px; border: 1px solid var(--line); background: var(--panel); cursor: pointer;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.font-tile:hover { border-color: var(--accent); transform: translateY(-1px); }
+.font-tile.current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); cursor: default; }
+.font-tile canvas { width: 100%; aspect-ratio: 220 / 150; display: block; border-radius: 5px; background: #0b1a2d; }
+.font-tile.no-preview canvas { opacity: 0.35; }
+.font-tile-label { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.font-tile-tag { position: absolute; top: 10px; left: 10px; background: var(--accent); color: #1a0d00; font-size: 11px; font-weight: 700; padding: 1px 7px; border-radius: 999px; }
+@media (max-width: 1180px) {
+  .numbers-layout { grid-template-columns: 1fr; }
+  .preview-panel { position: static; max-width: 420px; }
+}
+
 /* notes */
 .note { font-size: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(103, 216, 204, 0.08); color: var(--ok); margin-top: 8px; }
 .note.warn { background: rgba(255, 160, 58, 0.1); color: var(--accent-2); }

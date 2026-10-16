@@ -1,6 +1,7 @@
 (function () {
   'use strict';
   const M = window.TBModel;
+  const P = window.TBPreview;
   const api = window.tbApi;
 
   const state = {
@@ -15,6 +16,12 @@
     rawEditing: false,
     swapFrom: null,
     swapTo: null,
+    // number preview (display only, never written to the team file)
+    previewNumber: '27',
+    previewPos: 'chest',
+    previewBg: {},
+    fontQuery: '',
+    fontGridScroll: 0,
   };
 
   const $ = (id) => document.getElementById(id);
@@ -71,6 +78,8 @@
     state.variantIdx = 0;
     state.rawEditing = false;
     state.swapFrom = null;
+    state.previewBg = {};
+    state.fontGridScroll = 0;
     document.querySelectorAll('.sidenav button').forEach((b) => { b.disabled = false; });
     $('btnSave').disabled = false;
     refreshChrome();
@@ -315,8 +324,8 @@
     return h('div', null,
       viewHead('Uniforms', 'Pick a uniform, then change its numbers, helmet, brand logo and colors.'),
       tabs,
+      jersey && jersey.numberComp ? numbersStudio(jersey, M.getPart(state.original, origVariant, 'jersey'), v) : null,
       h('div', { class: 'grid' },
-        jersey && jersey.numberComp ? numbersCard(jersey, M.getPart(state.original, origVariant, 'jersey'), v) : null,
         helmet ? helmetCard(helmet, M.getPart(state.original, origVariant, 'helmet')) : null,
         brandCard(v),
         swapCard(v),
@@ -324,26 +333,180 @@
   }
 
   const CHANNEL_NAMES = { colorR: 'Main', colorG: 'Outline', colorB: 'Third' };
+  const NUMBER_CHANNELS = ['colorR', 'colorG', 'colorB'];
 
-  function numbersCard(jersey, origJersey, v) {
+  // ---------- number previews ----------
+  const previews = { index: null, digits: new Map(), thumbs: new Map(), thumbKey: '' };
+  const fontKey = (p) => String(p || '').replace('/uniforms/comp/', '/uniforms/').toLowerCase();
+  const previewEntry = (fontPath) => (previews.index && previews.index[fontKey(fontPath)]) || null;
+
+  function loadDigits(entry) {
+    if (!previews.digits.has(entry.file)) {
+      previews.digits.set(entry.file, api.numberPreview(entry.file).then((b) => new Uint8Array(b))
+        .catch((err) => { previews.digits.delete(entry.file); throw err; }));
+    }
+    return previews.digits.get(entry.file);
+  }
+
+  // Thumbnails are a tighter crop of the same full-size render, so numbers fill the tile.
+  const THUMB_W = 220;
+  const THUMB_H = 150;
+
+  function paint(canvas, result) {
+    canvas.getContext('2d').putImageData(new ImageData(result.pixels, result.width, result.height), 0, 0);
+  }
+
+  function jerseyBaseColor(jersey) {
+    const base = M.listPartColors(jersey).find((c) => c.group === 'Base materials');
+    return (base && base.hex) || M.getTeamColor(state.payload, 'primary') || '#1c3a5e';
+  }
+
+  function numbersStudio(jersey, origJersey, v) {
     const d = state.data;
-    const fonts = pickerOptions(M.listNumberFonts(d), (f) => f.label || f.displayName, (f) => f.displayName);
+    const fonts = M.listNumberFonts(d);
+    const fontLabel = (f) => f.label || f.displayName;
     const current = M.findFontByPath(d, M.currentNumberFontPath(jersey));
-    const currentLabel = current ? (current.label || current.displayName) : String(M.currentNumberFontPath(jersey)).split('/').pop();
+    const currentLabel = current ? fontLabel(current) : String(M.currentNumberFontPath(jersey)).split('/').pop() || '(none)';
 
-    const fontPicker = searchPicker('font', fonts, currentLabel, 'Search by school or year…', (font) => {
+    const positions = d.numberSizePositions.filter((pos) => M.getDeep(jersey, ['numberMaterialSettings', 'offsetScaleSpacing', pos.field]));
+    if (!positions.some((pos) => pos.key === state.previewPos)) state.previewPos = positions.length ? positions[0].key : 'chest';
+    const previewPos = () => positions.find((pos) => pos.key === state.previewPos) || positions[0];
+
+    const colors = () => NUMBER_CHANNELS.map((ch, i) => M.getNumberColor(jersey, ch) || P.DEFAULT_COLORS[i]);
+    const background = () => state.previewBg[v.suffix] || jerseyBaseColor(jersey);
+
+    // What a font looks like on this jersey: the live values for the current font,
+    // or the font's own tuned spacing and size (what applying it would set).
+    const liveParams = () => {
+      const pos = previewPos();
+      return {
+        fontPath: M.currentNumberFontPath(jersey),
+        spacing: M.getNumberSpacing(jersey),
+        scale: pos ? M.getDeep(jersey, ['numberMaterialSettings', 'offsetScaleSpacing', pos.field]) : null,
+      };
+    };
+    const fontParams = (font) => {
+      const live = liveParams();
+      const prof = d.numberLayoutProfiles[font.displayName] || {};
+      const pos = previewPos();
+      return {
+        fontPath: font.path,
+        spacing: typeof prof.numberSpacing === 'number' ? prof.numberSpacing : live.spacing,
+        scale: (pos && prof[pos.field]) || live.scale,
+      };
+    };
+    const render = (params, digits, entry, size) => P.renderNumber({
+      number: state.previewNumber, digits, available: entry && entry.digits, colors: colors(), background: background(),
+      spacing: params.spacing, scaleZ: params.scale && params.scale.z, scaleW: params.scale && params.scale.w,
+      width: size && size[0], height: size && size[1],
+    });
+
+    // ----- big preview -----
+    const big = h('canvas', { class: 'preview-canvas', width: P.WIDTH, height: P.HEIGHT });
+    const caption = h('div', { class: 'preview-caption' });
+    let hoverFont = null;
+    let drawToken = 0;
+    async function drawBig() {
+      const token = ++drawToken;
+      const params = hoverFont ? fontParams(hoverFont) : liveParams();
+      const pos = previewPos();
+      const entry = previewEntry(params.fontPath);
+      let text = hoverFont
+        ? `Previewing ${fontLabel(hoverFont)} with its tuned spacing and size. Click it to use it.`
+        : `${pos ? pos.label : 'Number'} size study · not a 3D game render`;
+      let digits = null;
+      if (entry) {
+        try { digits = await loadDigits(entry); } catch { text = 'Could not load this font\'s preview.'; }
+      } else if (params.fontPath) {
+        text = 'No preview image for this font. You can still use it.';
+      }
+      if (token !== drawToken) return;
+      const r = render(params, digits, entry);
+      paint(big, r);
+      if (digits && r.missing.length) text += ` · no image for digit ${[...new Set(r.missing)].join(', ')}`;
+      caption.textContent = text;
+    }
+
+    // ----- font browser -----
+    const grid = h('div', { class: 'font-grid' });
+    const visible = new Set();
+    const thumbSuffix = () => [state.previewNumber, state.previewPos, background(), ...colors(), M.getNumberSpacing(jersey)].join('|');
+    async function drawThumb(tile) {
+      const suffix = thumbSuffix();
+      if (previews.thumbKey !== suffix) { previews.thumbs.clear(); previews.thumbKey = suffix; }
+      if (tile.drawnKey === suffix) return;
+      tile.drawnKey = suffix;
+      const font = tile.font;
+      const cached = previews.thumbs.get(font.path);
+      const ctx = tile.canvas.getContext('2d');
+      if (cached) { ctx.putImageData(cached, 0, 0); return; }
+      const entry = previewEntry(font.path);
+      if (!entry) { tile.classList.add('no-preview'); return; }
+      let digits;
+      try { digits = await loadDigits(entry); } catch { tile.drawnKey = null; return; }
+      if (tile.drawnKey !== suffix) return;
+      paint(tile.canvas, render(fontParams(font), digits, entry, [THUMB_W, THUMB_H]));
+      previews.thumbs.set(font.path, ctx.getImageData(0, 0, tile.canvas.width, tile.canvas.height));
+    }
+    const observer = new IntersectionObserver((items) => {
+      items.forEach((it) => {
+        if (it.isIntersecting) { visible.add(it.target); drawThumb(it.target); } else visible.delete(it.target);
+      });
+    }, { root: grid, rootMargin: '120px' });
+
+    const applyFont = (font) => {
       const res = M.applyNumberFont(jersey, font, d);
       if (!res.ok) { toast(res.message, 'err'); return; }
-      edited(`Number font → ${font.label || font.displayName}` + (res.profileApplied.length ? ` (with its spacing and placement)` : ''));
+      edited(`Number font → ${fontLabel(font)}` + (res.profileApplied.length ? ' (with its spacing and placement)' : ''));
       toast(res.profileApplied.length
         ? `Font set. Also applied its tuned ${res.profileApplied.join(', ')}.`
         : 'Font set. No tuned layout on file for this font, so spacing and size were left as they were.');
       rerender();
+    };
+
+    const tiles = fonts.map((font) => {
+      const isCurrent = current && current.path === font.path;
+      const canvas = h('canvas', { width: THUMB_W, height: THUMB_H });
+      const tile = h('button', {
+        class: 'font-tile' + (isCurrent ? ' current' : ''),
+        title: `${fontLabel(font)}\n${font.displayName}`,
+        onclick: () => { if (!isCurrent) applyFont(font); },
+        onmouseenter: () => { hoverFont = font; drawBig(); },
+        onmouseleave: () => { if (hoverFont === font) { hoverFont = null; drawBig(); } },
+      }, canvas, h('span', { class: 'font-tile-label', text: fontLabel(font) }), isCurrent ? h('span', { class: 'font-tile-tag', text: 'Current' }) : null);
+      tile.font = font;
+      tile.canvas = canvas;
+      tile.search = `${fontLabel(font)} ${font.displayName}`.toLowerCase();
+      grid.appendChild(tile);
+      observer.observe(tile);
+      return tile;
     });
 
+    const count = h('span', { class: 'small muted' });
+    const filter = () => {
+      const q = state.fontQuery.trim().toLowerCase();
+      let n = 0;
+      tiles.forEach((t) => { t.hidden = !!q && !q.split(/\s+/).every((w) => t.search.includes(w)); if (!t.hidden) n++; });
+      count.textContent = `${n} of ${tiles.length} fonts`;
+    };
+    const search = h('input', { class: 'input', placeholder: 'Search fonts by school, year or style…', value: state.fontQuery, spellcheck: false });
+    search.addEventListener('input', () => { state.fontQuery = search.value; filter(); });
+    filter();
+    grid.addEventListener('scroll', () => { state.fontGridScroll = grid.scrollTop; });
+    requestAnimationFrame(() => { grid.scrollTop = state.fontGridScroll || 0; });
+
+    let refreshTimer = null;
+    const refresh = () => {
+      drawBig();
+      clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => visible.forEach((t) => drawThumb(t)), 120);
+    };
+
+    // ----- controls -----
     const chInfo = M.numberColorChannels(jersey, d);
     const colorRows = chInfo.channels.map((ch) => colorRow(`Number ${CHANNEL_NAMES[ch].toLowerCase()}`, null,
-      M.getNumberColor(jersey, ch), M.getNumberColor(origJersey, ch), (hex) => M.setNumberColor(jersey, ch, hex)));
+      M.getNumberColor(jersey, ch), M.getNumberColor(origJersey, ch),
+      (hex) => { const ok = M.setNumberColor(jersey, ch, hex); if (ok) refresh(); return ok; }));
 
     const spacing = M.getNumberSpacing(jersey);
     const origSpacing = M.getNumberSpacing(origJersey);
@@ -355,13 +518,14 @@
         M.setNumberSpacing(jersey, range.value);
         val.textContent = Number(range.value).toFixed(3);
         edited(`Number spacing → ${Number(range.value).toFixed(3)}`);
+        refresh();
       });
       spacingRow = h('div', { class: 'slider-row' }, h('span', { text: 'Spacing' }), range, val,
         h('button', { class: 'btn small ghost', text: 'Reset', disabled: origSpacing === null, onclick: () => { M.setNumberSpacing(jersey, origSpacing); edited('Number spacing reset.'); rerender(); } }));
     }
 
     const nms = jersey.numberMaterialSettings || {};
-    const sizeRows = state.data.numberSizePositions.map((pos) => {
+    const sizeRows = d.numberSizePositions.map((pos) => {
       const pct = M.getNumberSizePercent(jersey, origJersey, pos.field);
       if (pct === null) return null;
       const unused = (pos.key === 'shoulder' && nms.hasShoulder === false) || (pos.key === 'sleeve' && nms.hasSleeve === false);
@@ -371,19 +535,55 @@
         M.setNumberSizePercent(jersey, origJersey, pos.field, range.value);
         val.textContent = `${range.value}%`;
         edited(`${pos.label} number size → ${range.value}%`);
+        if (state.previewPos !== pos.key) { state.previewPos = pos.key; posSelect.value = pos.key; }
+        refresh();
       });
       return h('div', { class: 'slider-row', title: unused ? 'This jersey does not show numbers here.' : '' },
         h('span', { class: unused ? 'muted' : '', text: pos.label + (unused ? ' (unused)' : '') }), range, val,
         h('button', { class: 'btn small ghost', text: 'Reset', onclick: () => { M.setNumberSizePercent(jersey, origJersey, pos.field, 100); edited(`${pos.label} number size reset.`); rerender(); } }));
     }).filter(Boolean);
 
-    return card(`Jersey numbers · ${v.label}`, 'Font, colors, spacing and size of the numbers on this jersey.',
-      h('div', { class: 'section-label', text: 'Font' }), fontPicker,
-      colorRows.length ? [h('div', { class: 'section-label', text: 'Colors' }), colorRows,
-        chInfo.confirmed ? null : note('This font isn\'t in the confirmed list, so the color slots shown are a best guess from the file.', 'warn')] : null,
-      spacingRow ? [h('div', { class: 'section-label', text: 'Spacing' }), spacingRow] : null,
-      sizeRows.length ? [h('div', { class: 'section-label', text: 'Size' }), sizeRows,
-        note('Higher % should give bigger numbers in-game. Two players reported this direction, but it hasn\'t been fully confirmed yet, so check in game.', 'warn')] : null);
+    // ----- preview panel controls (preview only, never saved) -----
+    const numberInput = h('input', { class: 'input preview-number', value: state.previewNumber, maxLength: 2, inputMode: 'numeric', title: 'Number to preview' });
+    numberInput.addEventListener('input', () => {
+      numberInput.value = numberInput.value.replace(/\D/g, '').slice(0, 2);
+      state.previewNumber = numberInput.value;
+      refresh();
+    });
+    const posSelect = h('select', { class: 'input' }, positions.map((pos) => h('option', { value: pos.key, text: pos.label })));
+    posSelect.value = state.previewPos;
+    posSelect.addEventListener('change', () => { state.previewPos = posSelect.value; refresh(); });
+    const bgPicker = h('input', { type: 'color', value: background() });
+    bgPicker.addEventListener('input', () => { state.previewBg[v.suffix] = bgPicker.value.toLowerCase(); refresh(); });
+
+    drawBig();
+
+    return h('section', { class: 'card numbers-studio' },
+      h('div', { class: 'card-head' },
+        h('h2', { text: `Jersey numbers · ${v.label}` }),
+        h('span', { class: 'small muted', text: 'Font, colors, spacing and size of the numbers on this jersey.' })),
+      h('div', { class: 'numbers-layout' },
+        h('div', null,
+          h('div', { class: 'section-label', text: 'Font' }),
+          h('div', { class: 'current-font' }, h('b', { text: currentLabel }),
+            current ? h('span', { class: 'small muted', text: current.displayName }) : null),
+          colorRows.length ? [h('div', { class: 'section-label', text: 'Colors' }), colorRows,
+            chInfo.confirmed ? null : note('This font isn\'t in the confirmed list, so the color slots shown are a best guess from the file.', 'warn')] : null,
+          spacingRow ? [h('div', { class: 'section-label', text: 'Spacing' }), spacingRow] : null,
+          sizeRows.length ? [h('div', { class: 'section-label', text: 'Size' }), sizeRows,
+            note('Higher % should give bigger numbers in-game. Two players reported this direction, but it hasn\'t been fully confirmed yet, so check in game.', 'warn')] : null,
+          h('div', { class: 'font-browser' },
+            h('div', { class: 'row' }, h('div', { class: 'section-label', style: 'margin:0', text: 'Change font' }), h('div', { class: 'spacer' }), count),
+            h('p', { class: 'hint', text: 'Shown in this jersey\'s number colors with each font\'s tuned spacing and size. Hover to preview it large, click to use it.' }),
+            search, grid)),
+        h('div', { class: 'preview-panel' },
+          h('div', { class: 'row' }, h('div', { class: 'section-label', style: 'margin:0', text: 'Number preview' }), h('div', { class: 'spacer' }), numberInput),
+          big, caption,
+          h('div', { class: 'preview-options' },
+            positions.length > 1 ? h('label', null, h('span', { text: 'Size shown' }), posSelect) : null,
+            h('label', null, h('span', { text: 'Background' }), bgPicker,
+              h('button', { class: 'btn small ghost', text: 'Jersey color', onclick: () => { delete state.previewBg[v.suffix]; bgPicker.value = background(); refresh(); } }))),
+          h('div', { class: 'small muted', text: 'Preview settings are not saved to the team file.' }))));
   }
 
   function helmetCard(helmet, origHelmet) {
@@ -593,6 +793,11 @@
       return;
     }
     state.data = JSON.parse(await api.loadData());
+    try {
+      previews.index = JSON.parse(await api.numberPreviewIndex());
+    } catch {
+      previews.index = {}; // previews are a nice-to-have; editing works without them
+    }
     state.captures = await api.listCaptures();
     api.onCaptured((c) => {
       state.captures = [c, ...state.captures.filter((x) => x.id !== c.id && x.url !== c.url)];

@@ -48,8 +48,14 @@ the file you save goes straight into MMC with no conversion step.
    - **Team:** school name, nickname, abbreviation, city, state, stadium, year
      founded, the three team colors, and the team and crowd palettes.
    - **Uniforms** (pick Home, Away or any alternate):
-     - Jersey number font, searchable by school and year. A font with tuned
-       data also brings its spacing, placement and per-number kerning.
+     - Jersey number font, chosen from a searchable grid that shows every
+       font in your jersey's number colors. Hover over a font to see it in the
+       large **Number preview**, then click to use it. A font with tuned data
+       also brings its spacing, placement and per-number kerning.
+     - **Number preview:** type any number, pick which size to show (chest,
+       back, shoulder or sleeve), and pick a background color. The preview
+       updates as you change colors, spacing or size. It's a flat size study,
+       not a 3D render of the game, and its settings aren't saved to the team.
      - Number colors, spacing, and size for each position (chest, back,
        shoulder, sleeve).
      - Helmet shell finish (the matching accessory finish is set too) and
@@ -141,4 +147,11 @@ real team.
 - `src/data/tb-data.json`: catalogs and tuning data extracted from extension
   v0.76: 205 fonts, 389 shells, 291 accessories, 17 brand decals, 220 per-font
   number layouts, 193 number-color channel maps, and brand placement values.
+- `src/core/preview.js`: draws the number preview. Each font's digit images
+  are 120×120. Their red, green and blue channels mark where the number's main,
+  outline and third colors go, so the preview can be recolored live.
+- `src/assets/number-previews/`: digit images for all 205 fonts, packed one
+  file per font, from the CFB TEAMBUILDER Offline Editor's preview assets.
+  `tools/build-number-previews.js` regenerates them from that editor's
+  `preview_assets` folder.
 - `src/renderer/`: the UI. Plain HTML, CSS and JS, with no framework.

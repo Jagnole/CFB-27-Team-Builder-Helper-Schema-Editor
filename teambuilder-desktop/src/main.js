@@ -1,7 +1,9 @@
 const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const zlib = require('zlib');
 
+const PREVIEW_DIR = path.join(__dirname, 'assets', 'number-previews');
 const TEAM_BUILDER_URL = 'https://www.ea.com/games/ea-sports-college-football/team-builder';
 const EA_PARTITION = 'persist:ea-teambuilder';
 const TEAM_JSON_RE = /^https:\/\/cdn\.mcr\.ea\.com\/\d+\/bundles-users\/[^/]+\/[^/]+\/[^/?#]*nonce-primary\.json(?:[?#].*)?$/i;
@@ -182,6 +184,15 @@ function samePath(a, b) {
 function registerIpc() {
   ipcMain.handle('tb:data', () =>
     fs.readFileSync(path.join(__dirname, 'data', 'tb-data.json'), 'utf8'));
+
+  ipcMain.handle('tb:number-preview-index', () =>
+    fs.readFileSync(path.join(PREVIEW_DIR, 'index.json'), 'utf8'));
+
+  // One font's digits 0-9 as raw RGBA (see src/core/preview.js).
+  ipcMain.handle('tb:number-preview', (_e, file) => {
+    if (typeof file !== 'string' || !/^[A-Za-z0-9_-]+\.gz$/.test(file)) throw new Error('Unknown number preview.');
+    return zlib.gunzipSync(fs.readFileSync(path.join(PREVIEW_DIR, file)));
+  });
 
   ipcMain.handle('tb:open-signin', () => { openSignIn(); });
 

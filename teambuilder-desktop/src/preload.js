@@ -2,6 +2,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('tbApi', {
   loadData: () => ipcRenderer.invoke('tb:data'),
+  numberPreviewIndex: () => ipcRenderer.invoke('tb:number-preview-index'),
+  numberPreview: (file) => ipcRenderer.invoke('tb:number-preview', file),
   openSignIn: () => ipcRenderer.invoke('tb:open-signin'),
   listCaptures: () => ipcRenderer.invoke('tb:list-captures'),
   loadCapture: (id) => ipcRenderer.invoke('tb:load-capture', id),
