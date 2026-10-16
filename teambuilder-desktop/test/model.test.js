@@ -70,14 +70,17 @@ test('number font on a jersey with no number layer fails cleanly', () => {
   assert.equal(res.ok, false);
 });
 
-test('number colors set the tint and mark it as a value tint', () => {
+test('number colors set the tint without inventing extra keys', () => {
   const p = load();
   const jersey = M.getPart(p, M.deriveVariants(p)[0], 'jersey');
   const { channels } = M.numberColorChannels(jersey, data);
   assert.ok(channels.length >= 1);
+  const tint = jersey.numberComp.overlays[0].tint;
+  tint.TintMode = 'LayerCompTintMode_WithValue'; // left behind by older versions
   M.setNumberColor(jersey, channels[0], '#00ff00');
   assert.equal(M.getNumberColor(jersey, channels[0]), '#00ff00');
-  assert.equal(jersey.numberComp.overlays[0].tint.TintMode, 'LayerCompTintMode_WithValue');
+  assert.equal(tint.tintMode, 0);
+  assert.ok(!('TintMode' in tint), 'stray TintMode removed');
 });
 
 test('spacing is clamped to the safe range', () => {
@@ -174,4 +177,48 @@ test('logo colors read per piece and only set channels can change', () => {
   assert.equal(M.setDecalColor(pants, 'colorR', '#ff0000'), true);
   assert.equal(M.getDecalColors(pants).colorR, '#ff0000');
   assert.equal(M.getDecalColors(M.getPart(p, home, 'jersey')).colorR, '#ffffff', 'other pieces untouched');
+});
+
+// The fixture has no uploaded images, so add one the way the website stores them.
+function withCustomLayer() {
+  const p = load();
+  const home = M.deriveVariants(p)[0];
+  p.teamData.frostbiteData.textures = { Abc_collar: { url: 'https://cdn.mcr.ea.com/282/bundles-users/x/Abc_collar/1-0-0-z.png' } };
+  M.getPart(p, home, 'jersey').layerCompTexture.overlays.push({
+    info: { label: 'Custom Layer 3', slot: '' },
+    textures: { color: { textureId: 'Abc_collar' }, rsm: { textureId: 'ContentShared/characters/player/parts/uniforms/recipe/textures/red' } },
+    rsm: { rsmR: { reflectance: 0.5, smoothness: 0.65, metalMask: 0.75 }, rsmG: null, rsmB: null },
+    tint: { colorR: null, colorG: null, colorB: null, tintMode: 0 },
+  });
+  return p;
+}
+
+test('custom image layers are listed with their image and metal settings', () => {
+  const layers = M.listCustomLayers(withCustomLayer());
+  assert.equal(layers.length, 1);
+  assert.equal(layers[0].label, 'Custom Layer 3');
+  assert.match(layers[0].url, /Abc_collar/);
+  assert.equal(layers[0].rsm.metalMask, 0.75);
+});
+
+test('custom layer check flags removed layers and broken image links', () => {
+  const orig = withCustomLayer();
+  assert.deepEqual(M.checkCustomLayers(orig, M.clone(orig)), []);
+  const lost = M.clone(orig);
+  M.getPart(lost, M.deriveVariants(lost)[0], 'jersey').layerCompTexture.overlays.pop();
+  assert.match(M.checkCustomLayers(orig, lost).join(' '), /removed/);
+  const broken = M.clone(orig);
+  broken.teamData.frostbiteData.textures = {};
+  assert.match(M.checkCustomLayers(orig, broken).join(' '), /missing from the file/);
+});
+
+test('editing colors, fonts and logos keeps every custom layer intact', () => {
+  const orig = withCustomLayer();
+  const p = M.clone(orig);
+  const home = M.deriveVariants(p)[0];
+  M.replaceColorEverywhere(p, home, '#723e98', '#cc0000');
+  M.applyNumberFont(M.getPart(p, home, 'jersey'), M.listNumberFonts(data)[0], data);
+  M.applyVendorDecal(p, home, data.catalog.decals[0], data);
+  assert.deepEqual(M.checkCustomLayers(orig, p), []);
+  assert.deepEqual(M.getPart(p, home, 'jersey').layerCompTexture.overlays.at(-1), M.getPart(orig, home, 'jersey').layerCompTexture.overlays.at(-1));
 });

@@ -344,6 +344,7 @@
       h('div', { class: 'grid' },
         helmet ? helmetCard(helmet, M.getPart(state.original, origVariant, 'helmet')) : null,
         swapCard(v),
+        customLayersCard(v),
         M.PART_KINDS.map(({ kind, label }) => partColorsCard(v, origVariant, kind, label))));
   }
 
@@ -820,6 +821,28 @@
         })));
   }
 
+  // Images uploaded on the website, per piece. Read-only here: the app never
+  // changes them, and MMC downloads each one when it imports the team.
+  function customLayersCard(v) {
+    const keys = new Map(M.PART_KINDS.map((pk) => [v[pk.keyField], pk.label]));
+    const layers = M.listCustomLayers(state.payload).filter((l) => l.slot === 'color' && keys.has(l.key));
+    if (!layers.length) return null;
+    const pct = (x) => `${Math.round(x * 100)}%`;
+    return card(`Custom images · ${v.label}`, 'Logos and art uploaded on the Team Builder website. They are kept exactly as they are and brought into MMC with the team.',
+      layers.map((l) => {
+        const metal = l.rsm && typeof l.rsm.metalMask === 'number' ? l.rsm.metalMask : null;
+        return h('div', { class: 'custom-layer' },
+          h('div', { class: 'custom-thumb' }, l.url ? h('img', { src: l.url, alt: '', loading: 'lazy' }) : h('span', { class: 'small', text: 'missing' })),
+          h('div', { class: 'grow' },
+            h('div', { text: `${keys.get(l.key)} · ${l.label}` }),
+            h('div', { class: 'small muted', text: l.rsm ? `Metal ${pct(metal || 0)} · Smoothness ${pct(l.rsm.smoothness || 0)} · Reflectance ${pct(l.rsm.reflectance || 0)}` : 'Default finish' }),
+            metal !== null && metal >= 0.5
+              ? h('div', { class: 'small warn-text', text: 'Mostly metallic: it reflects its surroundings more than it shows its own colors, so previews with little lighting (like Frosty\'s) can show it as a gray shape.' })
+              : null,
+            l.url ? null : h('div', { class: 'small err-text', text: 'The image link is missing from this file.' })));
+      }));
+  }
+
   function partColorsCard(v, origVariant, kind, label) {
     const part = M.getPart(state.payload, v, kind);
     const orig = M.getPart(state.original, origVariant, kind);
@@ -837,6 +860,15 @@
   }
 
   // ---------- Changes ----------
+  function customLayerStatus() {
+    const layers = M.listCustomLayers(state.payload).filter((l) => l.slot === 'color');
+    if (!layers.length) return null;
+    const problems = M.checkCustomLayers(state.original, state.payload);
+    return problems.length
+      ? h('div', { class: 'note err', style: 'margin-bottom:16px' }, `Uploaded images need attention: ${problems.join(' ')}`)
+      : h('div', { class: 'note', style: 'margin-bottom:16px' }, `All ${layers.length} custom image layers are kept, and every uploaded image link is intact.`);
+  }
+
   function renderChanges() {
     const list = changes();
     const reportText = () => [`Changes to ${M.teamTitle(state.payload)}`, '', ...list.map((c) => `${c.label}: ${c.before} -> ${c.after}`)].join('\n');
@@ -854,6 +886,7 @@
           edited('All changes undone.');
           rerender();
         } })),
+      customLayerStatus(),
       list.length
         ? h('div', { class: 'card' }, h('table', { class: 'changes' },
           h('thead', null, h('tr', null, h('th', { text: 'What' }), h('th', { text: 'Before' }), h('th', { text: 'After' }))),
@@ -914,6 +947,8 @@
 
   async function save() {
     if (!state.payload || !api) return;
+    const problems = M.checkCustomLayers(state.original, state.payload);
+    if (problems.length && !confirm(`Your uploaded images don't all match the team as it was loaded:\n\n• ${problems.slice(0, 8).join('\n• ')}${problems.length > 8 ? `\n…and ${problems.length - 8} more` : ''}\n\nThese layers may show up blank or wrong after the MMC import. Save anyway?`)) return;
     const text = M.serialize(state.payload);
     const ti = M.getDeep(state.payload, ['teamData', 'teamInfos']) || {};
     const r = await api.saveFile({

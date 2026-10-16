@@ -269,7 +269,10 @@
     const tint = getDeep(part, ['numberComp', 'overlays', 0, 'tint']);
     if (!u || !tint) return false;
     tint[channel] = u;
-    tint.TintMode = 'LayerCompTintMode_WithValue';
+    // Team files store the mode as numeric `tintMode` (0 = tint with these
+    // values, as on every tinted layer). Earlier versions of this app (and
+    // extension v0.76) added a stray string `TintMode`; drop it when seen.
+    delete tint.TintMode;
     return true;
   }
 
@@ -414,6 +417,61 @@
       if (tint && isColor(tint[channel])) { tint[channel] = u; n++; }
     });
     return n > 0;
+  }
+
+  // ---------- custom (uploaded) image layers ----------
+  // Images uploaded on the website live in frostbiteData.textures as
+  // { id: { url } }; layers point at them by that id. MMC downloads each url
+  // when it imports the team, so every link has to survive editing.
+  function customTextures(payload) {
+    return getDeep(payload, ['teamData', 'frostbiteData', 'textures']) || {};
+  }
+
+  // Every layer (any part, any uniform) whose texture is an uploaded image.
+  function listCustomLayers(payload) {
+    const textures = customTextures(payload);
+    const out = [];
+    const parts = getDeep(payload, PARTS_PATH) || {};
+    Object.entries(parts).forEach(([plural, byKey]) => {
+      Object.entries(byKey || {}).forEach(([key, part]) => {
+        ['layerCompTexture', 'numberComp', 'fontComp'].forEach((comp) => {
+          (getDeep(part, [comp, 'overlays']) || []).forEach((o, i) => {
+            Object.entries((o && o.textures) || {}).forEach(([slot, t]) => {
+              const id = t && t.textureId;
+              if (typeof id !== 'string' || id.includes('/')) return;
+              out.push({
+                plural, key, comp, index: i, slot, textureId: id,
+                label: getDeep(o, ['info', 'label']) || `Layer ${i + 1}`,
+                url: (textures[id] && textures[id].url) || null,
+                rsm: getDeep(o, ['rsm', 'rsmR']) || null,
+              });
+            });
+          });
+        });
+      });
+    });
+    return out;
+  }
+
+  // Problems with uploaded images in `current` compared to `original`:
+  // links that no longer resolve, and layers or images that went missing.
+  function checkCustomLayers(original, current) {
+    const problems = [];
+    const id = (l) => `${l.plural}/${l.key}/${l.comp}/${l.index}/${l.slot}`;
+    const now = listCustomLayers(current);
+    now.filter((l) => !l.url).forEach((l) => problems.push(`${l.key} › ${l.label}: its image (${l.textureId}) is missing from the file.`));
+    const before = new Map(listCustomLayers(original).map((l) => [id(l), l]));
+    const after = new Map(now.map((l) => [id(l), l]));
+    before.forEach((l, k) => {
+      const a = after.get(k);
+      if (!a) problems.push(`${l.key} › ${l.label}: custom layer was removed.`);
+      else if (a.textureId !== l.textureId) problems.push(`${l.key} › ${l.label}: now points at a different image.`);
+    });
+    const kept = customTextures(current);
+    Object.keys(customTextures(original)).forEach((t) => {
+      if (!kept[t]) problems.push(`Uploaded image ${t} was removed from the file.`);
+    });
+    return problems;
   }
 
   // ---------- generic part colors ----------
@@ -562,6 +620,7 @@
     getNumberSpacing, setNumberSpacing, getNumberSizePercent, setNumberSizePercent,
     applyHelmetShell, findShell, getFacemaskColor, setFacemaskColor,
     findVendorDecalOverlays, currentDecal, applyVendorDecal, getDecalColors, setDecalColor,
+    listCustomLayers, checkCustomLayers,
     listPartColors, setColorAt, replaceColorEverywhere,
     changeReport,
   };

@@ -176,6 +176,16 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
   .preview-panel { position: static; max-width: 420px; }
 }
 
+/* custom image layers */
+.custom-layer { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed rgba(36, 54, 74, 0.6); }
+.custom-layer:last-child { border-bottom: 0; }
+.custom-layer .grow { flex: 1; min-width: 0; }
+.custom-thumb { width: 56px; height: 56px; flex-shrink: 0; display: grid; place-items: center; border-radius: 6px; border: 1px solid var(--line);
+  background: repeating-conic-gradient(#132b43 0 25%, #0e2236 0 50%) 50% / 12px 12px; overflow: hidden; }
+.custom-thumb img { max-width: 100%; max-height: 100%; object-fit: contain; }
+.warn-text { color: var(--accent-2); margin-top: 3px; }
+.err-text { color: var(--err); margin-top: 3px; }
+
 /* notes */
 .note { font-size: 12px; padding: 8px 10px; border-radius: 8px; background: rgba(103, 216, 204, 0.08); color: var(--ok); margin-top: 8px; }
 .note.warn { background: rgba(255, 160, 58, 0.1); color: var(--accent-2); }

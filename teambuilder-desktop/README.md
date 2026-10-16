@@ -76,11 +76,24 @@ the file you save goes straight into MMC with no conversion step.
        and socks.
    - **Team color chips:** every color picker has one-click chips for your
      team's primary, secondary and tertiary colors.
+   - **Custom images:** each uniform lists the logos and art uploaded on the
+     website, with their finish (metal, smoothness). The app never changes
+     them. When you save, it checks that every custom layer and image link is
+     still there, and warns you before saving if anything is missing.
    - **Changes:** every edit with its before and after values. You can save
      this as a report or undo everything.
    - **Raw JSON:** view the exact data, or edit it by hand (advanced).
 4. **Save .json** (Ctrl+S). The app won't let you overwrite the file you opened.
    Import the saved file in the MMC editor.
+
+## Troubleshooting
+
+- **A custom logo shows as a gray shape in Frosty.** Check that logo's finish
+  under Uniforms → Custom images. A mostly metallic layer (Metal 50% or more)
+  reflects its surroundings instead of showing its own colors. Frosty's preview
+  has little to reflect, so the logo can look like a flat gray silhouette there.
+  Check it in game. To rule out this app, import the untouched original from
+  **Start → Open captures folder** and compare.
 
 ## What it can't do (yet)
 
