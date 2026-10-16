@@ -94,7 +94,14 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 .input.changed, .swatch.changed input[type=color] { box-shadow: 0 0 0 2px var(--accent-soft); border-color: var(--accent); }
 
 /* color rows */
-.color-row { display: grid; grid-template-columns: 1fr auto 86px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(36, 54, 74, 0.6); }
+.team-chips { display: flex; gap: 4px; }
+.team-chip {
+  width: 20px; height: 20px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 2px solid rgba(255, 255, 255, 0.35); box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+  transition: transform 0.12s, border-color 0.12s;
+}
+.team-chip:hover { transform: scale(1.15); border-color: var(--accent); }
+.color-row { display: grid; grid-template-columns: 1fr auto auto 86px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px dashed rgba(36, 54, 74, 0.6); }
 .color-row:last-child { border-bottom: 0; }
 .color-row .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .color-row .chan { font-size: 11px; color: var(--muted); margin-left: 6px; }
@@ -107,6 +114,7 @@ input[type=color]::-webkit-color-swatch { border: 0; border-radius: 4px; }
 /* sliders */
 .slider-row { display: grid; grid-template-columns: 90px 1fr 64px auto; gap: 10px; align-items: center; margin-bottom: 8px; }
 input[type=range] { accent-color: var(--accent); width: 100%; }
+.slider-scale { display: flex; justify-content: space-between; margin: -4px 0 8px; padding-left: 100px; padding-right: 150px; font-size: 11px; color: var(--muted); }
 .value { font-family: Consolas, monospace; text-align: right; }
 
 /* tabs */
@@ -125,9 +133,7 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .preview-caption { font-size: 12px; color: var(--muted); min-height: 16px; }
 .preview-number { width: 64px; text-align: center; font-size: 18px; font-weight: 700; padding: 4px 6px; }
 .preview-options { display: flex; flex-direction: column; gap: 8px; }
-.preview-options label { display: grid; grid-template-columns: 90px auto 1fr; gap: 10px; align-items: center; color: var(--muted); }
-.preview-options select { width: auto; grid-column: 2 / 4; }
-.preview-options .btn { justify-self: start; }
+.preview-options .opt { display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; color: var(--muted); }
 .font-browser { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
 .font-browser .hint { margin: 6px 0 10px; color: var(--muted); font-size: 12px; }
 .font-grid {

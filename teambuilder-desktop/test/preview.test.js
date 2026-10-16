@@ -65,14 +65,59 @@ test('a smaller stored scale draws a bigger number', () => {
   assert.ok(bigger > normal * 1.8, `${bigger} vs ${normal}`);
 });
 
-test('wider spacing pushes two digits further apart', () => {
+test('more negative spacing pulls two digits closer together', () => {
   const opts = { number: '11', digits: syntheticDigits(), colors: ['#ffffff', '#ffffff'], background: '#000000', scaleZ: 1, scaleW: 1 };
   const firstLit = (r) => {
     const y = Math.round(r.height * 0.48);
     for (let x = 0; x < r.width; x++) if (pixel(r, x, y)[0] > 200) return x;
     return -1;
   };
-  assert.ok(firstLit(P.renderNumber({ ...opts, spacing: -0.6 })) < firstLit(P.renderNumber({ ...opts, spacing: -0.3 })));
+  assert.ok(firstLit(P.renderNumber({ ...opts, spacing: -0.3 })) < firstLit(P.renderNumber({ ...opts, spacing: -0.6 })));
+});
+
+test('numbers listed in playerNumberAdjust use their own spacing', () => {
+  const adjust = [{ number: 11, width: -0.7 }];
+  assert.equal(P.spacingForNumber('11', -0.45, adjust), -0.7);
+  assert.equal(P.spacingForNumber('27', -0.45, adjust), -0.45);
+  const r = P.renderNumber({ number: '11', digits: syntheticDigits(), spacing: -0.45, numberAdjust: adjust, background: '#000000' });
+  assert.equal(r.spacing, -0.7);
+});
+
+// Real in-game jerseys (number settings from the game's jersey part files). With
+// the right spacing model every number, including EA's per-number overrides,
+// leaves a small positive gap between the two digits.
+const GAME_JERSEYS = [
+  { jersey: 'AUB_JERSEY_2024_ORANGE', font: 'content/characters/player/parts/uniforms/jerseys/numbers/AUB_Jersey_2023_NUM_Array', spacing: -0.45, adjust: [{ number: 11, width: -0.64 }, { number: 10, width: -0.56 }, { number: 21, width: -0.56 }] },
+  { jersey: 'MIA_JERSEY_2024_ORANGE', font: 'content/characters/player/parts/uniforms/jerseys/numbers/MIA_Jersey_2025_NUM_Array', spacing: -0.445, adjust: [{ number: 11, width: -0.54 }, { number: 10, width: -0.48 }, { number: 21, width: -0.48 }] },
+  { jersey: 'MICH_JERSEY_2023_BLUE', font: 'ContentShared/characters/player/parts/uniforms/jerseys/numbers/Standard_Jersey_2021_MICH_NUM_Array', spacing: -0.47, adjust: [{ number: 11, width: -0.67 }, { number: 10, width: -0.59 }, { number: 21, width: -0.57 }] },
+  { jersey: 'NEB_JERSEY_2026_RED', font: 'content/characters/player/parts/uniforms/jerseys/numbers/NEB_Jersey_2026_NUM_Array', spacing: -0.37, adjust: [{ number: 11, width: -0.69 }, { number: 10, width: -0.53 }, { number: 21, width: -0.53 }] },
+  { jersey: 'TCU_JERSEY_2024_PURPLE', font: 'content/characters/player/parts/uniforms/jerseys/numbers/TCU_Jersey_2021_NUM_Array', spacing: -0.38, adjust: [{ number: 11, width: -0.64 }, { number: 10, width: -0.55 }, { number: 21, width: -0.45 }] },
+  { jersey: 'UTAH_JERSEY_2024_BLACKALT', font: 'content/characters/player/parts/uniforms/jerseys/numbers/UTAH_Jersey_2022_NUM_Array', spacing: -0.55, adjust: [{ number: 11, width: -0.72 }, { number: 10, width: -0.66 }, { number: 21, width: -0.62 }] },
+  { jersey: 'WIS_JERSEY_2024_RED', font: 'content/characters/player/parts/uniforms/jerseys/numbers/WIS_Jersey_2021_NUM_Array', spacing: -0.51, adjust: [{ number: 11, width: -0.73 }, { number: 10, width: -0.63 }, { number: 21, width: -0.63 }] },
+];
+
+test('game-tuned spacing leaves a small gap between digits, never a big overlap', () => {
+  const extents = (buf, d) => {
+    let l = P.DIGIT_SIZE, r = -1;
+    for (let y = 0; y < P.DIGIT_SIZE; y++) {
+      for (let x = 0; x < P.DIGIT_SIZE; x++) {
+        if (buf[d * P.DIGIT_BYTES + (y * P.DIGIT_SIZE + x) * 4 + 3] > 96) { l = Math.min(l, x); r = Math.max(r, x); }
+      }
+    }
+    return { l, r };
+  };
+  for (const j of GAME_JERSEYS) {
+    const entry = index[fontKey(j.font)];
+    assert.ok(entry, `${j.jersey} font has a preview`);
+    const buf = zlib.gunzipSync(fs.readFileSync(path.join(previewDir, entry.file)));
+    for (const n of [10, 11, 21, 27, 45, 88]) {
+      const a = extents(buf, Math.floor(n / 10));
+      const b = extents(buf, n % 10);
+      const sep = P.digitSeparation(P.spacingForNumber(String(n), j.spacing, j.adjust));
+      const gap = sep + b.l - a.r - 1;
+      assert.ok(gap > -4 && gap < 20, `${j.jersey} #${n}: gap ${gap.toFixed(1)}px`);
+    }
+  }
 });
 
 test('digits without a texture are reported, not drawn', () => {

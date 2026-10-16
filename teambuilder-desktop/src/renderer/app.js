@@ -161,23 +161,37 @@
     return h('div', { class: `note ${kind}`, text });
   }
 
+  // One-click chips for the team's primary / secondary / tertiary colors.
+  function teamColorChips(onPick) {
+    if (!state.payload) return null;
+    const seen = new Set();
+    const chips = M.TEAM_COLOR_SLOTS.map((s) => ({ label: s.label, hex: M.getTeamColor(state.payload, s.key) }))
+      .filter((c) => c.hex && !seen.has(c.hex) && seen.add(c.hex))
+      .map((c) => h('button', {
+        class: 'team-chip', title: `${c.label} team color ${c.hex.toUpperCase()}`, style: `background:${c.hex}`,
+        onclick: (e) => { e.preventDefault(); onPick(c.hex); },
+      }));
+    return chips.length ? h('div', { class: 'team-chips' }, chips) : null;
+  }
+
   // A color swatch + hex box. `onSet(hex)` mutates the payload and returns true on success.
-  function colorRow(name, sub, hex, originalHex, onSet) {
+  function colorRow(name, sub, hex, originalHex, onSet, { teamChips = true } = {}) {
     const picker = h('input', { type: 'color', value: hex || '#000000' });
     const text = h('input', { class: 'input hex', value: hex || '', maxLength: 7, spellcheck: false });
     const wrap = h('div', { class: 'swatch' + (originalHex && hex && originalHex !== hex ? ' changed' : '') }, picker);
-    const commit = (value, fromPicker) => {
+    const commit = (value) => {
       if (!/^#[0-9a-f]{6}$/i.test(value)) { toast('Use a six-digit hex color like #FF850B.', 'err'); text.value = picker.value; return; }
       if (!onSet(value.toLowerCase())) { toast(`Could not set ${name}.`, 'err'); return; }
-      if (fromPicker) text.value = value; else picker.value = value;
+      text.value = value.toLowerCase();
+      picker.value = value.toLowerCase();
       wrap.classList.toggle('changed', !!originalHex && originalHex !== value.toLowerCase());
       edited(`${name} → ${value}`);
     };
-    picker.addEventListener('input', () => commit(picker.value, true));
-    text.addEventListener('change', () => commit(text.value.trim().startsWith('#') ? text.value.trim() : '#' + text.value.trim(), false));
+    picker.addEventListener('input', () => commit(picker.value));
+    text.addEventListener('change', () => commit(text.value.trim().startsWith('#') ? text.value.trim() : '#' + text.value.trim()));
     return h('div', { class: 'color-row' },
       h('div', { class: 'name', title: name }, name, sub ? h('span', { class: 'chan', text: sub }) : null),
-      wrap, text);
+      teamChips ? teamColorChips(commit) : h('span'), wrap, text);
   }
 
   // Datalist values must be unique, so repeated labels get their asset name appended.
@@ -260,7 +274,7 @@
 
     const teamColors = card('Team colors', 'Used by menus, scoreboards and anything set to "team color".',
       M.TEAM_COLOR_SLOTS.map((s) => colorRow(s.label, null, M.getTeamColor(p, s.key), M.getTeamColor(o, s.key),
-        (hex) => M.setTeamColor(p, s.key, hex))),
+        (hex) => M.setTeamColor(p, s.key, hex), { teamChips: false })),
       h('div', { class: 'row', style: 'margin-top:12px' },
         h('button', {
           class: 'btn small', text: 'Copy to team & crowd palettes', onclick: () => {
@@ -382,9 +396,11 @@
       return {
         fontPath: M.currentNumberFontPath(jersey),
         spacing: M.getNumberSpacing(jersey),
+        numberAdjust: M.getDeep(jersey, ['numberMaterialSettings', 'playerNumberAdjust']),
         scale: pos ? M.getDeep(jersey, ['numberMaterialSettings', 'offsetScaleSpacing', pos.field]) : null,
       };
     };
+    // Mirrors applyNumberFont: profile values win, anything the profile lacks stays as is.
     const fontParams = (font) => {
       const live = liveParams();
       const prof = d.numberLayoutProfiles[font.displayName] || {};
@@ -392,12 +408,14 @@
       return {
         fontPath: font.path,
         spacing: typeof prof.numberSpacing === 'number' ? prof.numberSpacing : live.spacing,
+        numberAdjust: prof.playerNumberAdjust || live.numberAdjust,
         scale: (pos && prof[pos.field]) || live.scale,
       };
     };
     const render = (params, digits, entry, size) => P.renderNumber({
       number: state.previewNumber, digits, available: entry && entry.digits, colors: colors(), background: background(),
-      spacing: params.spacing, scaleZ: params.scale && params.scale.z, scaleW: params.scale && params.scale.w,
+      spacing: params.spacing, numberAdjust: params.numberAdjust,
+      scaleZ: params.scale && params.scale.z, scaleW: params.scale && params.scale.w,
       width: size && size[0], height: size && size[1],
     });
 
@@ -424,6 +442,9 @@
       const r = render(params, digits, entry);
       paint(big, r);
       if (digits && r.missing.length) text += ` · no image for digit ${[...new Set(r.missing)].join(', ')}`;
+      if (digits && r.spacing !== undefined && r.spacing !== params.spacing) {
+        text += ` · #${Number(state.previewNumber)} uses its own spacing (${r.spacing})`;
+      }
       caption.textContent = text;
     }
 
@@ -569,7 +590,11 @@
             current ? h('span', { class: 'small muted', text: current.displayName }) : null),
           colorRows.length ? [h('div', { class: 'section-label', text: 'Colors' }), colorRows,
             chInfo.confirmed ? null : note('This font isn\'t in the confirmed list, so the color slots shown are a best guess from the file.', 'warn')] : null,
-          spacingRow ? [h('div', { class: 'section-label', text: 'Spacing' }), spacingRow] : null,
+          spacingRow ? [h('div', { class: 'section-label', text: 'Spacing' }), spacingRow,
+            h('div', { class: 'slider-scale' }, h('span', { text: '← Closer together' }), h('span', { text: 'Further apart →' })),
+            Array.isArray(nms.playerNumberAdjust) && nms.playerNumberAdjust.length
+              ? h('div', { class: 'small muted', text: `${nms.playerNumberAdjust.length} number${nms.playerNumberAdjust.length === 1 ? '' : 's'} (like ${nms.playerNumberAdjust.slice(0, 3).map((a) => a.number).join(', ')}) get their own spacing in game, usually tighter for thin 1s. Type one in the preview to see it.` })
+              : null] : null,
           sizeRows.length ? [h('div', { class: 'section-label', text: 'Size' }), sizeRows,
             note('Higher % should give bigger numbers in-game. Two players reported this direction, but it hasn\'t been fully confirmed yet, so check in game.', 'warn')] : null,
           h('div', { class: 'font-browser' },
@@ -580,9 +605,11 @@
           h('div', { class: 'row' }, h('div', { class: 'section-label', style: 'margin:0', text: 'Number preview' }), h('div', { class: 'spacer' }), numberInput),
           big, caption,
           h('div', { class: 'preview-options' },
-            positions.length > 1 ? h('label', null, h('span', { text: 'Size shown' }), posSelect) : null,
-            h('label', null, h('span', { text: 'Background' }), bgPicker,
-              h('button', { class: 'btn small ghost', text: 'Jersey color', onclick: () => { delete state.previewBg[v.suffix]; bgPicker.value = background(); refresh(); } }))),
+            positions.length > 1 ? h('div', { class: 'opt' }, h('span', { text: 'Size shown' }), posSelect) : null,
+            h('div', { class: 'opt' }, h('span', { text: 'Background' }),
+              h('div', { class: 'row' }, bgPicker,
+                teamColorChips((hex) => { state.previewBg[v.suffix] = hex; bgPicker.value = hex; refresh(); }),
+                h('button', { class: 'btn small ghost', text: 'Jersey color', onclick: () => { delete state.previewBg[v.suffix]; bgPicker.value = background(); refresh(); } })))),
           h('div', { class: 'small muted', text: 'Preview settings are not saved to the team file.' }))));
   }
 
@@ -654,6 +681,7 @@
       h('div', { class: 'row' }, chips),
       h('div', { class: 'row', style: 'margin-top:12px' },
         h('span', { class: 'muted', text: 'Replace with' }), target,
+        teamColorChips((hex) => { target.value = hex; state.swapTo = hex; }),
         h('button', {
           class: 'btn primary small', text: 'Replace', disabled: !state.swapFrom, onclick: () => {
             if (target.value.toLowerCase() === state.swapFrom) { toast('Pick a different replacement color first.', 'warn'); return; }

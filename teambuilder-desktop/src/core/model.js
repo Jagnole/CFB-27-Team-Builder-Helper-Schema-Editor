@@ -15,8 +15,10 @@
     { kind: 'socks', plural: 'socks', keyField: 'socksKey', label: 'Socks' },
   ];
   const NUMBER_SPACING_PATH = ['numberMaterialSettings', 'offsetScaleSpacing', 'numberSpacing', 'x'];
-  const NUMBER_SPACING_MIN = -0.6;
-  const NUMBER_SPACING_MAX = -0.3;
+  // More negative = digits closer together. In-game jerseys use -0.65 to -0.157,
+  // so the range covers all of them with a little room either side.
+  const NUMBER_SPACING_MIN = -0.7;
+  const NUMBER_SPACING_MAX = -0.15;
   const NUMBER_SIZE_MIN = 50;
   const NUMBER_SIZE_MAX = 150;
   const NUMBER_OFFSET_SCALE_FIELDS = [

@@ -14,11 +14,27 @@
   const DIGIT_BYTES = DIGIT_SIZE * DIGIT_SIZE * 4;
   const WIDTH = 320;
   const HEIGHT = 250;
-  const SPACING_MIN = -0.6;
-  const SPACING_MAX = -0.3;
   const DEFAULT_COLORS = ['#ffffff', '#151515', '#000000'];
 
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  // Distance between the two digits' centres, in pixels. numberSpacing is how far
+  // the digit cells overlap, so -0.47 puts the centres 0.53 of a digit apart and a
+  // more negative value pulls the digits closer. Checked against 258 in-game
+  // jerseys: this leaves a steady ~6px gap between digits (and EA's per-number
+  // overrides such as "11" land on the same gap), while |spacing| would make
+  // 63% of numbers overlap.
+  function digitSeparation(spacing, scaleX = 1) {
+    const s = typeof spacing === 'number' && Number.isFinite(spacing) ? clamp(spacing, -0.95, 0) : -0.45;
+    return (1 + s) * DIGIT_SIZE * scaleX;
+  }
+
+  // The game swaps in a per-number spacing for numbers listed in playerNumberAdjust.
+  function spacingForNumber(number, spacing, adjust) {
+    const n = Number(number);
+    const hit = Array.isArray(adjust) && adjust.find((a) => a && a.number === n && typeof a.width === 'number');
+    return hit ? hit.width : spacing;
+  }
 
   function hexToRgb(hex) {
     const m = /^#?([0-9a-f]{6})$/i.exec(String(hex || ''));
@@ -96,8 +112,9 @@
 
   // opts: number ("27"), digits (Uint8Array of ten 120x120 RGBA digits back to back),
   // available (digit list), colors ([R, G, B] hex), background (hex),
-  // spacing (stored numberSpacing.x), scaleZ / scaleW (stored offsetScale z / w).
-  // Returns { pixels, width, height, missing }.
+  // spacing (stored numberSpacing.x), numberAdjust (stored playerNumberAdjust),
+  // scaleZ / scaleW (stored offsetScale z / w).
+  // Returns { pixels, width, height, missing, spacing }.
   function renderNumber(opts) {
     const width = opts.width || WIDTH;
     const height = opts.height || HEIGHT;
@@ -109,8 +126,8 @@
     const colors = [0, 1, 2].map((i) => hexToRgb(opts.colors && opts.colors[i]) || hexToRgb(DEFAULT_COLORS[i]));
     const sx = scaleFromStored(opts.scaleZ);
     const sy = scaleFromStored(opts.scaleW);
-    const spacing = typeof opts.spacing === 'number' ? opts.spacing : -0.5;
-    const separation = Math.abs(clamp(spacing, SPACING_MIN, SPACING_MAX)) * DIGIT_SIZE * sx;
+    const spacing = spacingForNumber(number, opts.spacing, opts.numberAdjust);
+    const separation = digitSeparation(spacing, sx);
     const cx = width / 2;
     const positions = number.length === 1 ? [cx] : [cx - separation / 2, cx + separation / 2];
     const cy = Math.round(height * 0.48);
@@ -121,8 +138,8 @@
       if (!available.includes(d) || opts.digits.length < (d + 1) * DIGIT_BYTES) { missing.push(ch); return; }
       drawDigit(px, width, height, opts.digits, d * DIGIT_BYTES, positions[idx], cy, colors, sx, sy);
     });
-    return { pixels: px, width, height, missing };
+    return { pixels: px, width, height, missing, spacing };
   }
 
-  return { DIGIT_SIZE, DIGIT_BYTES, WIDTH, HEIGHT, DEFAULT_COLORS, hexToRgb, scaleFromStored, jerseyBackground, renderNumber };
+  return { DIGIT_SIZE, DIGIT_BYTES, WIDTH, HEIGHT, DEFAULT_COLORS, hexToRgb, scaleFromStored, digitSeparation, spacingForNumber, jerseyBackground, renderNumber };
 });

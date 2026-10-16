@@ -54,8 +54,13 @@ the file you save goes straight into MMC with no conversion step.
        also brings its spacing, placement and per-number kerning.
      - **Number preview:** type any number, pick which size to show (chest,
        back, shoulder or sleeve), and pick a background color. The preview
-       updates as you change colors, spacing or size. It's a flat size study,
-       not a 3D render of the game, and its settings aren't saved to the team.
+       updates as you change colors, spacing or size. Numbers with their own
+       spacing (like 11) are shown with it, as the game does. It's a flat size
+       study, not a 3D render of the game, and its settings aren't saved to the
+       team.
+     - **Spacing:** a more negative value puts the digits closer together.
+       The slider covers -0.70 to -0.15, which includes every in-game jersey
+       (they range from -0.65 to -0.16).
      - Number colors, spacing, and size for each position (chest, back,
        shoulder, sleeve).
      - Helmet shell finish (the matching accessory finish is set too) and
@@ -65,6 +70,8 @@ the file you save goes straight into MMC with no conversion step.
      - **Swap a color** recolors every swatch on the uniform that uses one color.
      - Every individual material and stripe color on the helmet, jersey, pants
        and socks.
+   - **Team color chips:** every color picker has one-click chips for your
+     team's primary, secondary and tertiary colors.
    - **Changes:** every edit with its before and after values. You can save
      this as a report or undo everything.
    - **Raw JSON:** view the exact data, or edit it by hand (advanced).
@@ -149,7 +156,11 @@ real team.
   number layouts, 193 number-color channel maps, and brand placement values.
 - `src/core/preview.js`: draws the number preview. Each font's digit images
   are 120×120. Their red, green and blue channels mark where the number's main,
-  outline and third colors go, so the preview can be recolored live.
+  outline and third colors go, so the preview can be recolored live. The two
+  digit centers sit `(1 + numberSpacing)` digit-widths apart. Across 258
+  in-game jerseys, that leaves a steady ~6 px gap between digits, including
+  EA's per-number overrides. The older `|numberSpacing|` formula overlapped
+  63% of numbers.
 - `src/assets/number-previews/`: digit images for all 205 fonts, packed one
   file per font, from the CFB TEAMBUILDER Offline Editor's preview assets.
   `tools/build-number-previews.js` regenerates them from that editor's
