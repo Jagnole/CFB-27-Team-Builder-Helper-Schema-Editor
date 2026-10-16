@@ -8,6 +8,10 @@ picker instead of memorizing cryptic asset codes.
 **Not affiliated with or endorsed by EA. Use at your own risk — this edits
 locally captured data in your own browser and does not touch EA's servers.**
 
+> **New: CFB TeamBuilder Studio.** A desktop app that grabs your team from the
+> Team Builder website, edits it, and saves a `.json` ready for MMC import. See
+> [`teambuilder-desktop/`](teambuilder-desktop/README.md).
+
 ## Why this exists
 
 We need more fonts so dammit, here's every single one in the game.

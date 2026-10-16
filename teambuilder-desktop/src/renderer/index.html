@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://cdn.mcr.ea.com; connect-src 'none'; object-src 'none'">
+  <title>CFB TeamBuilder Studio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark">TB</span>
+      <div>
+        <div class="brand-name">CFB TEAMBUILDER <b>Studio</b></div>
+        <div class="brand-sub">Website team → edit → MMC-ready JSON</div>
+      </div>
+    </div>
+    <div class="team-badge" id="teamBadge" hidden>
+      <img id="teamLogo" alt="" hidden>
+      <div>
+        <div class="team-badge-name" id="teamBadgeName"></div>
+        <div class="team-badge-source" id="teamBadgeSource"></div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn" id="btnSignIn" title="Open Team Builder and grab your team">Get from Team Builder</button>
+      <button class="btn" id="btnOpen" title="Ctrl+O">Open .json</button>
+      <button class="btn primary" id="btnSave" title="Ctrl+S" disabled>Save .json</button>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="sidenav" id="sidenav">
+      <button data-view="home" class="active">Start</button>
+      <button data-view="team" disabled>Team</button>
+      <button data-view="uniforms" disabled>Uniforms</button>
+      <button data-view="changes" disabled>Changes <span class="pill" id="changeCount" hidden>0</span></button>
+      <button data-view="raw" disabled>Raw JSON</button>
+    </nav>
+    <main class="content" id="content"></main>
+  </div>
+
+  <footer class="statusbar">
+    <span id="statusText">Ready.</span>
+    <span id="dirtyText" class="muted"></span>
+  </footer>
+
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+
+  <script src="../core/model.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
