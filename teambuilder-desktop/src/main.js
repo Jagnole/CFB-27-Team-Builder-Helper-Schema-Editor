@@ -4,6 +4,7 @@ const path = require('path');
 const zlib = require('zlib');
 
 const PREVIEW_DIR = path.join(__dirname, 'assets', 'number-previews');
+const DECAL_PREVIEW_DIR = path.join(__dirname, 'assets', 'decal-previews');
 const TEAM_BUILDER_URL = 'https://www.ea.com/games/ea-sports-college-football/team-builder';
 const EA_PARTITION = 'persist:ea-teambuilder';
 const TEAM_JSON_RE = /^https:\/\/cdn\.mcr\.ea\.com\/\d+\/bundles-users\/[^/]+\/[^/]+\/[^/?#]*nonce-primary\.json(?:[?#].*)?$/i;
@@ -193,6 +194,9 @@ function registerIpc() {
     if (typeof file !== 'string' || !/^[A-Za-z0-9_-]+\.gz$/.test(file)) throw new Error('Unknown number preview.');
     return zlib.gunzipSync(fs.readFileSync(path.join(PREVIEW_DIR, file)));
   });
+
+  ipcMain.handle('tb:decal-preview-index', () =>
+    fs.readFileSync(path.join(DECAL_PREVIEW_DIR, 'index.json'), 'utf8'));
 
   ipcMain.handle('tb:open-signin', () => { openSignIn(); });
 

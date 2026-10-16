@@ -21,6 +21,7 @@
     previewPos: 'chest',
     previewBg: {},
     fontQuery: '',
+    decalQuery: '',
     fontGridScroll: 0,
   };
 
@@ -338,10 +339,10 @@
     return h('div', null,
       viewHead('Uniforms', 'Pick a uniform, then change its numbers, helmet, brand logo and colors.'),
       tabs,
+      brandStudio(v, origVariant),
       jersey && jersey.numberComp ? numbersStudio(jersey, M.getPart(state.original, origVariant, 'jersey'), v) : null,
       h('div', { class: 'grid' },
         helmet ? helmetCard(helmet, M.getPart(state.original, origVariant, 'helmet')) : null,
-        brandCard(v),
         swapCard(v),
         M.PART_KINDS.map(({ kind, label }) => partColorsCard(v, origVariant, kind, label))));
   }
@@ -633,20 +634,144 @@
         colorRow('Facemask color', null, facemask, M.getFacemaskColor(origHelmet), (hex) => M.setFacemaskColor(helmet, hex))] : null);
   }
 
-  function brandCard(v) {
+  // ---------- brand logo (vendor decal) ----------
+  const decalPreviews = { index: null };
+  const DECAL_PIECES = [['jersey', 'Jersey'], ['pants', 'Pants'], ['socks', 'Socks']];
+  const DECAL_CHANNEL_NAMES = { colorR: 'main', colorG: 'second', colorB: 'third' };
+  const SVG_NS = 'http://www.w3.org/2000/svg';
+  const decalKey = (col) => String(col || '').split('/').pop().toLowerCase();
+
+  // The logo drawn in the given region colors ({ R, G, B } hex), or null when
+  // there is no preview for it. Vector traces are recolored per region; the
+  // metallic "Diamond" art is shown as it is.
+  function decalArt(decal, colors) {
+    const e = decal && decalPreviews.index && decalPreviews.index[decalKey(decal.col)];
+    if (!e) return null;
+    if (e.type === 'vector') {
+      const svg = document.createElementNS(SVG_NS, 'svg');
+      svg.setAttribute('viewBox', e.viewBox);
+      svg.setAttribute('class', 'decal-art');
+      const g = document.createElementNS(SVG_NS, 'g');
+      g.setAttribute('transform', e.transform);
+      Object.entries(e.regions).forEach(([ch, d]) => {
+        const path = document.createElementNS(SVG_NS, 'path');
+        path.setAttribute('d', d);
+        path.setAttribute('fill', colors[ch] || colors.R);
+        g.appendChild(path);
+      });
+      svg.appendChild(g);
+      return svg;
+    }
+    return h('img', { class: 'decal-art', src: `../assets/decal-previews/${e.file}`, alt: '' });
+  }
+
+  function brandStudio(v, origVariant) {
     const d = state.data;
     const p = state.payload;
-    const hasAny = ['jersey', 'pants', 'socks'].some((k) => M.findVendorDecalOverlays(M.getPart(p, v, k)).length);
-    if (!hasAny) return null;
+    const pieces = DECAL_PIECES
+      .map(([kind, label]) => ({ kind, label, part: M.getPart(p, v, kind), orig: M.getPart(state.original, origVariant, kind) }))
+      .filter((x) => M.findVendorDecalOverlays(x.part).length);
+    if (!pieces.length) return null;
     const current = M.currentDecal(p, v, d);
-    const options = pickerOptions(d.catalog.decals, (x) => x.label, (x) => x.col.split('/').pop());
-    return card('Brand logo', 'Swaps the maker\'s logo on the jersey, pants and socks together, with tested placement for Nike, Jordan, Under Armour and Adidas.',
-      searchPicker('decal', options, current && current.label, 'Search brand…', (decal) => {
-        const results = M.applyVendorDecal(p, v, decal, d);
-        edited(`Brand logo → ${decal.label}`);
-        toast(results.map((r) => `${r.kind}: ${r.ok ? r.note : 'skipped (' + r.note + ')'}`).join(' · '), results.every((r) => r.ok) ? 'ok' : 'warn');
+    const isCurrent = (decal) => !!current && current.col === decal.col;
+
+    // Unset channels fall back to the main color so every region still draws.
+    const regionColors = (piece) => {
+      const c = M.getDecalColors(piece.part) || {};
+      const main = c.colorR || M.getTeamColor(p, 'primary') || '#ffffff';
+      return { R: main, G: c.colorG || main, B: c.colorB || main };
+    };
+    const pieceBg = (piece) => (M.listPartColors(piece.part).find((c) => c.group === 'Base materials') || {}).hex || '#1c3a5e';
+    const stage = (decal, piece, cls) => h('div', { class: `decal-stage ${cls}`, style: `background-color:${pieceBg(piece)}` },
+      decalArt(decal, regionColors(piece)) || h('span', { class: 'decal-missing', text: 'No preview' }));
+
+    // ----- preview panel: the lead piece large, every piece small -----
+    const previewBox = h('div', { class: 'decal-preview' });
+    const caption = h('div', { class: 'preview-caption' });
+    let hover = null;
+    const drawPreview = () => {
+      const decal = hover || current;
+      previewBox.replaceChildren(
+        stage(decal, pieces[0], 'big'),
+        h('div', { class: 'decal-minis' }, pieces.map((piece) => h('div', null, stage(decal, piece, 'mini'), h('div', { class: 'small muted', text: piece.label })))));
+      const e = decal && decalPreviews.index && decalPreviews.index[decalKey(decal.col)];
+      const how = e && e.type === 'image' ? 'metallic art, shown in its own colors' : 'shown in each piece\'s logo colors';
+      caption.textContent = hover
+        ? `Previewing ${hover.label} (${how}). Click it to use it.`
+        : decal ? `${decal.label} · ${how}.` : 'No brand logo on this uniform.';
+    };
+
+    // ----- gallery -----
+    const grid = h('div', { class: 'decal-grid' });
+    const drawGrid = () => grid.replaceChildren(...d.catalog.decals.map((decal) => {
+      const tile = h('button', {
+        class: 'decal-tile' + (isCurrent(decal) ? ' current' : ''),
+        title: decal.label,
+        onclick: () => {
+          if (isCurrent(decal)) return;
+          const results = M.applyVendorDecal(p, v, decal, d);
+          edited(`Brand logo → ${decal.label}`);
+          toast(results.map((r) => `${r.kind}: ${r.ok ? r.note : 'skipped (' + r.note + ')'}`).join(' · '), results.every((r) => r.ok) ? 'ok' : 'warn');
+          rerender();
+        },
+        onmouseenter: () => { hover = decal; drawPreview(); },
+        onmouseleave: () => { if (hover === decal) { hover = null; drawPreview(); } },
+      }, stage(decal, pieces[0], 'thumb'), h('span', { class: 'font-tile-label', text: decal.label }),
+      isCurrent(decal) ? h('span', { class: 'font-tile-tag', text: 'Current' }) : null);
+      tile.search = `${decal.label} ${decal.brand || ''}`.toLowerCase();
+      return tile;
+    }));
+    const count = h('span', { class: 'small muted' });
+    const filter = () => {
+      const q = state.decalQuery.trim().toLowerCase();
+      let n = 0;
+      [...grid.children].forEach((t) => { t.hidden = !!q && !q.split(/\s+/).every((w) => t.search.includes(w)); if (!t.hidden) n++; });
+      count.textContent = `${n} of ${grid.children.length} logos`;
+    };
+    const search = h('input', { class: 'input', placeholder: 'Search logos (Nike, Jordan, Adidas, Under Armour…)', value: state.decalQuery, spellcheck: false });
+    search.addEventListener('input', () => { state.decalQuery = search.value; filter(); });
+    const redraw = () => { drawGrid(); filter(); drawPreview(); };
+
+    // ----- logo colors, per piece -----
+    const colorRows = pieces.map((piece) => {
+      const now = M.getDecalColors(piece.part) || {};
+      const was = M.getDecalColors(piece.orig) || {};
+      const rows = Object.keys(DECAL_CHANNEL_NAMES).filter((ch) => now[ch]).map((ch) =>
+        colorRow(`${piece.label} logo ${DECAL_CHANNEL_NAMES[ch]}`, null, now[ch], was[ch],
+          (hex) => { const ok = M.setDecalColor(piece.part, ch, hex); if (ok) redraw(); return ok; }));
+      return rows;
+    });
+    const copyColors = pieces.length > 1 ? h('button', {
+      class: 'btn small', text: `Use ${pieces[0].label.toLowerCase()} logo colors on ${pieces.slice(1).map((x) => x.label.toLowerCase()).join(' & ')}`,
+      onclick: () => {
+        const src = M.getDecalColors(pieces[0].part) || {};
+        let n = 0;
+        pieces.slice(1).forEach((piece) => Object.keys(DECAL_CHANNEL_NAMES).forEach((ch) => {
+          if (src[ch] && M.setDecalColor(piece.part, ch, src[ch])) n++;
+        }));
+        edited(`Copied ${pieces[0].label.toLowerCase()} logo colors to ${n} swatch${n === 1 ? '' : 'es'}.`);
         rerender();
-      }));
+      },
+    }) : null;
+
+    redraw();
+
+    return h('section', { class: 'card brand-studio' },
+      h('div', { class: 'card-head' },
+        h('h2', { text: `Brand logo · ${v.label}` }),
+        h('span', { class: 'small muted', text: `Current: ${current ? current.label : 'none'} · on ${pieces.map((x) => x.label.toLowerCase()).join(', ')}` })),
+      h('div', { class: 'studio-layout' },
+        h('div', null,
+          h('div', { class: 'row' }, h('div', { class: 'section-label', style: 'margin:0', text: 'Change logo' }), h('div', { class: 'spacer' }), count),
+          h('p', { class: 'hint', text: 'Swaps the maker\'s logo on the jersey, pants and socks together, with tested placement for Nike, Jordan, Under Armour and Adidas. Hover to preview, click to use.' }),
+          search, grid,
+          h('div', { class: 'section-label', text: 'Logo colors' }),
+          colorRows,
+          copyColors ? h('div', { class: 'row', style: 'margin-top:10px' }, copyColors) : null),
+        h('div', { class: 'preview-panel' },
+          h('div', { class: 'section-label', style: 'margin:0', text: 'Logo preview' }),
+          previewBox, caption,
+          h('div', { class: 'small muted', text: 'Flat preview on each piece\'s base color, not a 3D render. Placement on the uniform comes from the logo\'s tested settings.' }))));
   }
 
   function variantColors(v) {
@@ -825,6 +950,11 @@
       previews.index = JSON.parse(await api.numberPreviewIndex());
     } catch {
       previews.index = {}; // previews are a nice-to-have; editing works without them
+    }
+    try {
+      decalPreviews.index = JSON.parse(await api.decalPreviewIndex());
+    } catch {
+      decalPreviews.index = {};
     }
     state.captures = await api.listCaptures();
     api.onCaptured((c) => {

@@ -133,3 +133,18 @@ test('real font renders its fill in the main color', () => {
   for (let i = 0; i < r.pixels.length; i += 4) if (r.pixels[i] > 200 && r.pixels[i + 1] < 60 && r.pixels[i + 2] < 60) red++;
   assert.ok(red > 1500, `expected a visible red fill, got ${red} pixels`);
 });
+
+test('every brand logo in the catalog has a preview', () => {
+  const dir = path.join(__dirname, '../src/assets/decal-previews');
+  const decals = JSON.parse(fs.readFileSync(path.join(dir, 'index.json'), 'utf8'));
+  for (const decal of data.catalog.decals) {
+    const e = decals[decal.col.split('/').pop().toLowerCase()];
+    assert.ok(e, `${decal.label} has a preview`);
+    if (e.type === 'vector') {
+      assert.ok(Object.keys(e.regions).length && Object.keys(e.regions).every((k) => ['R', 'G', 'B'].includes(k)), decal.label);
+    } else {
+      assert.match(e.file, /^[A-Za-z0-9_-]+\.png$/);
+      assert.ok(fs.existsSync(path.join(dir, e.file)), e.file);
+    }
+  }
+});

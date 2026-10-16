@@ -65,8 +65,12 @@ the file you save goes straight into MMC with no conversion step.
        shoulder, sleeve).
      - Helmet shell finish (the matching accessory finish is set too) and
        facemask color.
-     - Brand logo on the jersey, pants and socks, with tested placement for
-       Nike, Jordan, Under Armour and Adidas.
+     - **Brand logo** (first on the page): a gallery of all 17 maker logos,
+       drawn in your uniform's logo colors. Hover over a logo to preview it on
+       the jersey, pants and socks, then click to swap it on all three, with
+       tested placement for Nike, Jordan, Under Armour and Adidas. You can
+       change each piece's logo colors there too, or copy the jersey's logo
+       colors to the pants and socks.
      - **Swap a color** recolors every swatch on the uniform that uses one color.
      - Every individual material and stripe color on the helmet, jersey, pants
        and socks.
@@ -165,4 +169,8 @@ real team.
   file per font, from the CFB TEAMBUILDER Offline Editor's preview assets.
   `tools/build-number-previews.js` regenerates them from that editor's
   `preview_assets` folder.
+- `src/assets/decal-previews/`: brand logo previews. 15 are vector outlines
+  from extension v0.76; their red, green and blue areas take the logo's three
+  colors. The two metallic Diamond decals use the Offline Editor's art, shown
+  in their own colors. `tools/build-decal-previews.js` regenerates them.
 - `src/renderer/`: the UI. Plain HTML, CSS and JS, with no framework.

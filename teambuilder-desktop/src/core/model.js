@@ -392,6 +392,30 @@
     return results;
   }
 
+  // Logo colors of a part's brand decal, read from its first vendor overlay.
+  // Channels the overlay leaves unset come back as null.
+  function getDecalColors(part) {
+    const idx = findVendorDecalOverlays(part)[0];
+    if (idx === undefined) return null;
+    const tint = getDeep(part, ['layerCompTexture', 'overlays', idx, 'tint']) || {};
+    const out = {};
+    ['colorR', 'colorG', 'colorB'].forEach((ch) => { out[ch] = isColor(tint[ch]) ? unitToHex(tint[ch]) : null; });
+    return out;
+  }
+
+  // Sets one logo color on every vendor overlay of the part (two-sided logos
+  // have two). Only channels that are already set, like listPartColors.
+  function setDecalColor(part, channel, hex) {
+    const u = hexToUnit(hex);
+    if (!u) return false;
+    let n = 0;
+    findVendorDecalOverlays(part).forEach((i) => {
+      const tint = getDeep(part, ['layerCompTexture', 'overlays', i, 'tint']);
+      if (tint && isColor(tint[channel])) { tint[channel] = u; n++; }
+    });
+    return n > 0;
+  }
+
   // ---------- generic part colors ----------
   const isColor = (c) => c && typeof c === 'object' && typeof c.r === 'number' && typeof c.g === 'number' && typeof c.b === 'number';
 
@@ -537,7 +561,7 @@
     numberColorChannels, getNumberColor, setNumberColor,
     getNumberSpacing, setNumberSpacing, getNumberSizePercent, setNumberSizePercent,
     applyHelmetShell, findShell, getFacemaskColor, setFacemaskColor,
-    findVendorDecalOverlays, currentDecal, applyVendorDecal,
+    findVendorDecalOverlays, currentDecal, applyVendorDecal, getDecalColors, setDecalColor,
     listPartColors, setColorAt, replaceColorEverywhere,
     changeReport,
   };

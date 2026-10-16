@@ -164,3 +164,14 @@ test('a resized table is reported as a single change', () => {
   assert.equal(report[0].before, '1 entry');
   assert.equal(report[0].after, '2 entries');
 });
+
+test('logo colors read per piece and only set channels can change', () => {
+  const p = load();
+  const home = M.deriveVariants(p)[0];
+  const pants = M.getPart(p, home, 'pants');
+  assert.deepEqual(M.getDecalColors(pants), { colorR: '#0f1b2a', colorG: null, colorB: null });
+  assert.equal(M.setDecalColor(pants, 'colorG', '#ff0000'), false);
+  assert.equal(M.setDecalColor(pants, 'colorR', '#ff0000'), true);
+  assert.equal(M.getDecalColors(pants).colorR, '#ff0000');
+  assert.equal(M.getDecalColors(M.getPart(p, home, 'jersey')).colorR, '#ffffff', 'other pieces untouched');
+});
