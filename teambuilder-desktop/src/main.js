@@ -24,7 +24,7 @@ function createMainWindow() {
     height: 900,
     minWidth: 1024,
     minHeight: 680,
-    backgroundColor: '#071426',
+    backgroundColor: '#0a0b10', // Crimson theme background, shown before the page paints
     title: 'CFB TeamBuilder Studio',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),

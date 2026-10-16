@@ -81,7 +81,7 @@
     state.swapFrom = null;
     state.previewBg = {};
     state.fontGridScroll = 0;
-    document.querySelectorAll('.sidenav button').forEach((b) => { b.disabled = false; });
+    document.querySelectorAll('.sidenav button[data-view]').forEach((b) => { b.disabled = false; });
     $('btnSave').disabled = false;
     refreshChrome();
     setStatus(`Loaded ${M.teamTitle(payload)}.`);
@@ -140,7 +140,7 @@
 
   function show(view) {
     state.view = view;
-    document.querySelectorAll('.sidenav button').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+    document.querySelectorAll('.sidenav button[data-view]').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
     if (content.contains(document.activeElement)) document.activeElement.blur();
     content.replaceChildren();
     const views = { home: renderHome, team: renderTeam, uniforms: renderUniforms, changes: renderChanges, raw: renderRaw };
@@ -1053,8 +1053,40 @@
     toast(`Saved. Import ${r.path} into the MMC editor to build your mod.`);
   }
 
+  // ---------- color theme ----------
+  const THEMES = [
+    { id: 'crimson', name: 'Crimson', swatch: '#e11d48' },
+    { id: 'midnight-blue', name: 'Midnight Blue', swatch: '#3b82f6' },
+    { id: 'ice-blue', name: 'Ice Blue', swatch: '#38bdf8' },
+    { id: 'navy-red', name: 'Navy & Red', swatch: '#d62839' },
+    { id: 'jcothron2', name: 'Orange & Navy', swatch: '#ff850b', credit: 'The original Studio colors, a tribute to JCothron2.' },
+  ];
+
+  function renderThemePicker() {
+    const current = document.documentElement.getAttribute('data-theme') || 'crimson';
+    const setTheme = (id) => {
+      document.documentElement.setAttribute('data-theme', id);
+      try { localStorage.setItem('tb-theme', id); } catch { /* not saved; still applied */ }
+      renderThemePicker();
+    };
+    const select = h('select', { 'aria-label': 'Color theme', onchange: (e) => setTheme(e.target.value) },
+      THEMES.map((t) => h('option', { value: t.id, text: t.id === 'crimson' ? `${t.name} (default)` : t.name })));
+    select.value = current;
+    const theme = THEMES.find((t) => t.id === current);
+    $('themePicker').replaceChildren(...[
+      h('label', { text: 'Theme' }),
+      select,
+      h('div', { class: 'theme-swatches' }, THEMES.map((t) => h('button', {
+        class: 'theme-swatch' + (t.id === current ? ' active' : ''), title: t.name, 'aria-label': `${t.name} theme`,
+        style: `background:${t.swatch}`, onclick: () => setTheme(t.id),
+      }))),
+      theme && theme.credit ? h('div', { class: 'theme-credit', text: theme.credit }) : null,
+    ].filter(Boolean));
+  }
+  renderThemePicker();
+
   // ---------- wiring ----------
-  document.querySelectorAll('.sidenav button').forEach((b) => b.addEventListener('click', () => show(b.dataset.view)));
+  document.querySelectorAll('.sidenav button[data-view]').forEach((b) => b.addEventListener('click', () => show(b.dataset.view)));
   $('btnSignIn').addEventListener('click', signIn);
   $('btnOpen').addEventListener('click', openFile);
   $('btnSave').addEventListener('click', save);

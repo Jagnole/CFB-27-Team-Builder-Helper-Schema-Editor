@@ -95,6 +95,17 @@ the file you save goes straight into MMC with no conversion step.
   Check it in game. To rule out this app, import the untouched original from
   **Start → Open captures folder** and compare.
 
+## Themes
+
+Pick a color theme under **Theme** at the bottom of the sidebar. The app
+remembers your choice.
+
+- **Crimson** (default)
+- **Midnight Blue**
+- **Ice Blue**
+- **Navy & Red**
+- **Orange & Navy**: the original Studio colors, a tribute to JCothron2.
+
 ## What it can't do (yet)
 
 - **Logos and custom textures.** These are uploaded on the website. The team
@@ -139,7 +150,9 @@ git push origin studio-v0.1.0
 
 The workflow attaches both exes to a GitHub Release with install instructions.
 
-The app icon is `build/icon.svg`. `build/icon.png` and `build/icon.ico` are
+Themes are CSS variables at the top of `src/renderer/styles.css`, one block per
+theme. `src/renderer/theme.js` applies the saved one before the page draws.
+The app icon is `build/icon.svg`, in Crimson colors. `build/icon.png` and `build/icon.ico` are
 rendered from it. `build/after-pack.js` writes the icon and version details
 into the exe.
 

@@ -1,21 +1,51 @@
+/* Themes. Crimson is the default; the others are picked under Theme in the
+   sidebar (see theme.js). Every color in the UI comes from these variables. */
+:root, :root[data-theme="crimson"] {
+  --bg: #0a0b10;
+  --panel: #101219;
+  --card: #161923;
+  --card-2: #1d212d;
+  --line: #2a2f3d;
+  --line-strong: #454c60;    /* hovered borders, dropdown edge */
+  --text: #f3f4f7;
+  --muted: #9ba1b0;
+  --accent: #e11d48;
+  --accent-2: #fb4f6e;
+  --accent-soft: rgba(225, 29, 72, 0.16);
+  --on-accent: #ffffff;      /* text on accent-colored buttons, tabs, tags */
+  --input: #0d0f15;          /* text fields and preview wells */
+  --check-a: #1d212d;        /* transparency checkerboard */
+  --check-b: #151820;
+  --ok: #60a5fa;
+  --err: #ff6b8b;
+}
+:root[data-theme="midnight-blue"] {
+  --bg: #050c18; --panel: #091428; --card: #0e1d36; --card-2: #132746;
+  --line: #1f3558; --line-strong: #2f4f7f; --text: #eef3fb; --muted: #8da2c0;
+  --accent: #3b82f6; --accent-2: #60a5fa; --accent-soft: rgba(59, 130, 246, 0.16); --on-accent: #ffffff;
+  --input: #081326; --check-a: #132746; --check-b: #0d1d36; --ok: #5eead4; --err: #f87171;
+}
+:root[data-theme="ice-blue"] {
+  --bg: #06111b; --panel: #0a1825; --card: #0f2131; --card-2: #142a3d;
+  --line: #1f3a52; --line-strong: #2e5677; --text: #eef7fc; --muted: #8fb0c4;
+  --accent: #38bdf8; --accent-2: #7dd3fc; --accent-soft: rgba(56, 189, 248, 0.15); --on-accent: #03263a;
+  --input: #08141f; --check-a: #142a3d; --check-b: #0e2131; --ok: #34d399; --err: #f87171;
+}
+:root[data-theme="navy-red"] {
+  --bg: #071426; --panel: #0a1b30; --card: #10233b; --card-2: #132b43;
+  --line: #24364a; --line-strong: #35516f; --text: #f4f7fc; --muted: #8a9db3;
+  --accent: #d62839; --accent-2: #ff4d5e; --accent-soft: rgba(214, 40, 57, 0.16); --on-accent: #ffffff;
+  --input: #0b1a2d; --check-a: #132b43; --check-b: #0e2236; --ok: #60a5fa; --err: #ff6b6b;
+}
+/* The original Studio colors, a tribute to JCothron2. */
+:root[data-theme="jcothron2"] {
+  --bg: #071426; --panel: #0a1b30; --card: #10233b; --card-2: #132b43;
+  --line: #24364a; --line-strong: #35516f; --text: #f4f7fc; --muted: #8a9db3;
+  --accent: #ff850b; --accent-2: #ffa03a; --accent-soft: rgba(255, 133, 11, 0.14); --on-accent: #1a0d00;
+  --input: #0b1a2d; --check-a: #132b43; --check-b: #0e2236; --ok: #67d8cc; --err: #ff6b6b;
+}
+
 :root {
-  --bg: #071426;
-  --panel: #0a1b30;
-  --card: #10233b;
-  --card-2: #132b43;
-  --line: #24364a;
-  --text: #f4f7fc;
-  --muted: #8a9db3;
-  --accent: #ff850b;
-  --accent-2: #ffa03a;
-  --accent-soft: rgba(255, 133, 11, 0.14);
-  --on-accent: #1a0d00;      /* text on accent-colored buttons, tabs, tags */
-  --input: #0b1a2d;          /* text fields and preview wells */
-  --line-strong: var(--line-strong);    /* hovered borders, dropdown edge */
-  --check-a: #132b43;        /* transparency checkerboard */
-  --check-b: #0e2236;
-  --ok: #67d8cc;
-  --err: #ff6b6b;
   --radius: 10px;
   font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
   font-size: 14px;
@@ -66,13 +96,20 @@ h1, h2, h3 { margin: 0; font-weight: 600; }
 /* layout */
 .layout { flex: 1; display: flex; min-height: 0; }
 .sidenav { width: 190px; padding: 16px 10px; background: var(--panel); border-right: 1px solid var(--line); display: flex; flex-direction: column; gap: 4px; }
-.sidenav button {
+.sidenav button[data-view] {
   text-align: left; padding: 10px 12px; border-radius: 8px; border: 0; background: transparent; cursor: pointer;
   display: flex; align-items: center; justify-content: space-between;
 }
-.sidenav button:hover:not(:disabled) { background: var(--card); }
-.sidenav button.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.sidenav button:disabled { opacity: 0.35; cursor: default; }
+.sidenav button[data-view]:hover:not(:disabled) { background: var(--card); }
+.sidenav button[data-view].active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.sidenav button[data-view]:disabled { opacity: 0.35; cursor: default; }
+.theme-picker { margin-top: auto; padding: 12px 4px 0; border-top: 1px solid var(--line); }
+.theme-picker label { display: block; font-size: 11px; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+.theme-picker select { width: 100%; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--input); }
+.theme-swatches { display: flex; gap: 6px; margin-top: 8px; }
+.theme-swatch { width: 18px; height: 18px; padding: 0; border-radius: 50%; cursor: pointer; border: 2px solid transparent; box-shadow: 0 0 0 1px var(--line-strong); }
+.theme-swatch.active { border-color: var(--text); }
+.theme-credit { margin-top: 6px; font-size: 11px; color: var(--muted); }
 .pill { background: var(--accent); color: var(--on-accent); border-radius: 999px; padding: 0 8px; font-size: 12px; font-weight: 700; }
 .content { flex: 1; overflow: auto; padding: 24px 28px 48px; }
 

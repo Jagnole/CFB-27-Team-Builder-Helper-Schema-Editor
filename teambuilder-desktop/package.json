@@ -1,7 +1,7 @@
 {
   "name": "cfb-teambuilder-studio",
   "productName": "CFB TeamBuilder Studio",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Grab a team from the EA CFB 27 Team Builder website, edit it, and save an MMC-ready team JSON.",
   "main": "src/main.js",
   "private": true,
