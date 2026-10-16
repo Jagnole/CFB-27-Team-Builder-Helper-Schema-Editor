@@ -8,11 +8,13 @@
   "scripts": {
     "start": "electron .",
     "test": "node --test test/model.test.js",
-    "dist": "electron-builder --win portable nsis"
+    "dist": "electron-builder --win --x64 --publish never"
   },
   "devDependencies": {
     "electron": "^33.2.1",
-    "electron-builder": "^25.1.8"
+    "electron-builder": "^25.1.8",
+    "pe-library": "^2.0.1",
+    "resedit": "^3.1.0"
   },
   "build": {
     "appId": "com.jagnole.cfb-teambuilder-studio",
@@ -22,13 +24,36 @@
       "package.json"
     ],
     "directories": {
-      "output": "dist"
+      "output": "dist",
+      "buildResources": "build"
     },
+    "afterPack": "build/after-pack.js",
     "win": {
       "target": [
-        "portable",
-        "nsis"
-      ]
+        "nsis",
+        "portable"
+      ],
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "shortcutName": "CFB TeamBuilder Studio",
+      "runAfterFinish": true,
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "artifactName": "CFB-TeamBuilder-Studio-Setup-${version}.${ext}"
+    },
+    "portable": {
+      "artifactName": "CFB-TeamBuilder-Studio-Portable-${version}.${ext}"
     }
+  },
+  "author": "jagnole",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jagnole/cfb-27-team-builder-helper-schema-editor.git"
   }
 }

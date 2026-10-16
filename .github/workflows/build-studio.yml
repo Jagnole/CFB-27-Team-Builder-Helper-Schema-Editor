@@ -1,0 +1,58 @@
+name: Build CFB TeamBuilder Studio
+
+# Every push that touches the app builds the Windows installer and portable exe
+# (downloadable from the run's "Artifacts" section).
+# Pushing a tag like "studio-v0.1.0" also publishes them as a GitHub Release,
+# which gives people a normal download page.
+on:
+  push:
+    paths:
+      - "teambuilder-desktop/**"
+      - ".github/workflows/build-studio.yml"
+    tags:
+      - "studio-v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: teambuilder-desktop
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: teambuilder-desktop/package-lock.json
+
+      - run: npm ci
+      - run: npm test
+      - run: npm run dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CFB-TeamBuilder-Studio-windows
+          path: |
+            teambuilder-desktop/dist/*Setup*.exe
+            teambuilder-desktop/dist/*Portable*.exe
+          if-no-files-found: error
+
+      - if: startsWith(github.ref, 'refs/tags/studio-v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: CFB TeamBuilder Studio ${{ github.ref_name }}
+          files: |
+            teambuilder-desktop/dist/*Setup*.exe
+            teambuilder-desktop/dist/*Portable*.exe
+          body: |
+            **Download `CFB-TeamBuilder-Studio-Setup-….exe`** below and double-click it. It installs in a few seconds (no admin needed) and adds a desktop shortcut.
+
+            Prefer not to install? Download the `Portable` exe instead and run it from anywhere.
+
+            Windows may show "Windows protected your PC" because the app isn't code-signed. Click **More info → Run anyway**.

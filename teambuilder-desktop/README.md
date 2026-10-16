@@ -8,6 +8,24 @@ can import into the MMC editor to build a mod.
 Team Builder website → grab team → edit here → Save .json → MMC editor import → mod
 ```
 
+## Install it (no coding needed)
+
+1. Go to the repo's **Releases** page and download
+   **`CFB-TeamBuilder-Studio-Setup-x.y.z.exe`**.
+2. Double-click it. It installs in a few seconds, needs no admin password, and
+   opens the app. You'll get a **CFB TeamBuilder Studio** shortcut on your
+   desktop and in the Start menu.
+3. If Windows shows **"Windows protected your PC"**, click **More info → Run
+   anyway**. You see this because the app isn't code-signed, which is a paid
+   certificate. It doesn't mean anything is wrong.
+
+**Don't want to install anything?** Download
+`CFB-TeamBuilder-Studio-Portable-x.y.z.exe` instead. It runs from anywhere,
+including a USB stick or your Downloads folder. It takes a few extra seconds to
+start each time.
+
+**Uninstall:** Windows Settings → Apps → CFB TeamBuilder Studio → Uninstall.
+
 It replaces two older tools:
 
 - **The Chrome extension** (in this repo's root): it captured the same team JSON,
@@ -57,7 +75,9 @@ the file you save goes straight into MMC with no conversion step.
 - **Pushing edits back to the website.** Not included; the target is MMC. The
   Chrome extension can still do this.
 
-## Running from source (Windows)
+## For developers
+
+### Running from source
 
 Requires [Node.js](https://nodejs.org) 20 or newer.
 
@@ -67,13 +87,31 @@ npm install
 npm start
 ```
 
-### Building an .exe to share
+### Building the .exe files
 
 ```
 npm run dist
 ```
 
-This produces a portable `.exe` and an installer in `teambuilder-desktop/dist/`.
+This writes the installer (`…-Setup-x.y.z.exe`) and the portable exe
+(`…-Portable-x.y.z.exe`) to `teambuilder-desktop/dist/`. It works on Windows as
+is. On Linux or macOS the installer step also needs Wine.
+
+The **Build CFB TeamBuilder Studio** GitHub workflow builds both on Windows for
+every push that changes the app. You can download them from the workflow run's
+Artifacts. To publish a release, bump `version` in `package.json` and push a
+matching tag:
+
+```
+git tag studio-v0.1.0
+git push origin studio-v0.1.0
+```
+
+The workflow attaches both exes to a GitHub Release with install instructions.
+
+The app icon is `build/icon.svg`. `build/icon.png` and `build/icon.ico` are
+rendered from it. `build/after-pack.js` writes the icon and version details
+into the exe.
 
 ### Tests
 

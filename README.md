@@ -9,8 +9,9 @@ picker instead of memorizing cryptic asset codes.
 locally captured data in your own browser and does not touch EA's servers.**
 
 > **New: CFB TeamBuilder Studio.** A desktop app that grabs your team from the
-> Team Builder website, edits it, and saves a `.json` ready for MMC import. See
-> [`teambuilder-desktop/`](teambuilder-desktop/README.md).
+> Team Builder website, edits it, and saves a `.json` ready for MMC import.
+> Download the Windows installer from the **Releases** page; no coding is
+> needed. Details are in [`teambuilder-desktop/`](teambuilder-desktop/README.md).
 
 ## Why this exists
 
