@@ -69,8 +69,11 @@ the file you save goes straight into MMC with no conversion step.
        drawn in your uniform's logo colors. Hover over a logo to preview it on
        the jersey, pants and socks, then click to swap it on all three, with
        tested placement for Nike, Jordan, Under Armour and Adidas. You can
-       change each piece's logo colors there too, or copy the jersey's logo
-       colors to the pants and socks.
+       change each piece's logo colors there too: the main color, plus the
+       second and third colors on logos that have them (outlines, trims,
+       inner shapes). A color the file leaves unset shows as "not set";
+       fill it in, or click "clear" to empty it again. You can also copy the
+       jersey's logo colors to the pants and socks.
      - **Swap a color** recolors every swatch on the uniform that uses one color.
      - Every individual material and stripe color on the helmet, jersey, pants
        and socks.

@@ -407,14 +407,26 @@
   }
 
   // Sets one logo color on every vendor overlay of the part (two-sided logos
-  // have two). Only channels that are already set, like listPartColors.
-  function setDecalColor(part, channel, hex) {
+  // have two). By default only channels that are already set, like
+  // listPartColors; pass { allowUnset: true } to fill in an unset (null)
+  // channel, for logos that have a second or third color area.
+  function setDecalColor(part, channel, hex, { allowUnset = false } = {}) {
     const u = hexToUnit(hex);
-    if (!u) return false;
+    if (!u || !['colorR', 'colorG', 'colorB'].includes(channel)) return false;
     let n = 0;
     findVendorDecalOverlays(part).forEach((i) => {
       const tint = getDeep(part, ['layerCompTexture', 'overlays', i, 'tint']);
-      if (tint && isColor(tint[channel])) { tint[channel] = u; n++; }
+      if (tint && (isColor(tint[channel]) || (allowUnset && tint[channel] == null))) { tint[channel] = u; n++; }
+    });
+    return n > 0;
+  }
+
+  // Puts a logo color back to unset (null) on every vendor overlay of the part.
+  function clearDecalColor(part, channel) {
+    let n = 0;
+    findVendorDecalOverlays(part).forEach((i) => {
+      const tint = getDeep(part, ['layerCompTexture', 'overlays', i, 'tint']);
+      if (tint && channel in tint && tint[channel] !== null) { tint[channel] = null; n++; }
     });
     return n > 0;
   }
@@ -619,7 +631,7 @@
     numberColorChannels, getNumberColor, setNumberColor,
     getNumberSpacing, setNumberSpacing, getNumberSizePercent, setNumberSizePercent,
     applyHelmetShell, findShell, getFacemaskColor, setFacemaskColor,
-    findVendorDecalOverlays, currentDecal, applyVendorDecal, getDecalColors, setDecalColor,
+    findVendorDecalOverlays, currentDecal, applyVendorDecal, getDecalColors, setDecalColor, clearDecalColor,
     listCustomLayers, checkCustomLayers,
     listPartColors, setColorAt, replaceColorEverywhere,
     changeReport,

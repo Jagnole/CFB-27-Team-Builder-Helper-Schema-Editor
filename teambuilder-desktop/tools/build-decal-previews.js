@@ -104,18 +104,22 @@ const index = {};
 for (const decal of data.catalog.decals) {
   const key = decal.col.split('/').pop().toLowerCase();
   const trace = svgs[decal.label];
+  const raster = rasters.get(key);
+  // Tint channels the logo has areas for (R = main, G = second, B = third):
+  // union of the vector trace regions and the Offline Editor's channel list.
+  const found = new Set(['R', ...Object.keys((trace && trace.regions) || {}), ...((raster && raster.channels) || [])]);
+  const channels = ['R', 'G', 'B'].filter((c) => found.has(c));
   if (trace) {
-    index[key] = { type: 'vector', viewBox: trace.viewBox, transform: trace.transform, regions: trace.regions };
+    index[key] = { type: 'vector', viewBox: trace.viewBox, transform: trace.transform, regions: trace.regions, channels };
     continue;
   }
-  const raster = rasters.get(key);
   if (raster) {
     const rgba = fs.readFileSync(path.join(vendorDir, raster.entry));
     if (rgba.length !== W * H * 4) throw new Error(`${raster.entry}: unexpected size ${rgba.length}`);
     const file = `${raster.id}.png`;
     const mask = isMask(rgba);
     fs.writeFileSync(path.join(outDir, file), png(mask ? rgba : shadeMap(rgba), W, H));
-    index[key] = mask ? { type: 'image', file, mask: true } : { type: 'image', file, shade: true };
+    index[key] = mask ? { type: 'image', file, mask: true, channels } : { type: 'image', file, shade: true, channels };
     continue;
   }
   console.warn(`no preview for ${decal.label}`);

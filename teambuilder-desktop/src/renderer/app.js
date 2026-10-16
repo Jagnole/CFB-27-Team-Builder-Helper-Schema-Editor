@@ -824,13 +824,36 @@
     const redraw = () => { drawGrid(); filter(); drawPreview(); };
 
     // ----- logo colors, per piece -----
+    // Every color area the current logo has (main, second, third), plus any
+    // channel the file already sets. Unset ones can be filled in.
+    const entry = current && decalPreviews.index && decalPreviews.index[decalKey(current.col)];
+    const logoChannels = new Set(((entry && entry.channels) || ['R']).map((c) => `color${c}`));
     const colorRows = pieces.map((piece) => {
       const now = M.getDecalColors(piece.part) || {};
       const was = M.getDecalColors(piece.orig) || {};
-      const rows = Object.keys(DECAL_CHANNEL_NAMES).filter((ch) => now[ch]).map((ch) =>
-        colorRow(`${piece.label} logo ${DECAL_CHANNEL_NAMES[ch]}`, null, now[ch], was[ch],
-          (hex) => { const ok = M.setDecalColor(piece.part, ch, hex); if (ok) redraw(); return ok; }));
-      return rows;
+      return Object.keys(DECAL_CHANNEL_NAMES).filter((ch) => now[ch] || logoChannels.has(ch)).map((ch) => {
+        const name = `${piece.label} logo ${DECAL_CHANNEL_NAMES[ch]}`;
+        let row = null;
+        const addClear = () => {
+          if (was[ch] || row.querySelector('.link-btn')) return;
+          row.firstChild.appendChild(h('button', {
+            class: 'link-btn', text: 'clear', title: 'Back to not set',
+            onclick: () => { M.clearDecalColor(piece.part, ch); edited(`${name} cleared.`); rerender(); },
+          }));
+        };
+        row = colorRow(name, now[ch] ? null : 'not set', now[ch], was[ch], (hex) => {
+          const ok = M.setDecalColor(piece.part, ch, hex, { allowUnset: true });
+          if (ok) {
+            const chan = row.querySelector('.chan');
+            if (chan) chan.remove();
+            addClear();
+            redraw();
+          }
+          return ok;
+        });
+        if (now[ch]) addClear();
+        return row;
+      });
     });
     const copyColors = pieces.length > 1 ? h('button', {
       class: 'btn small', text: `Use ${pieces[0].label.toLowerCase()} logo colors on ${pieces.slice(1).map((x) => x.label.toLowerCase()).join(' & ')}`,
@@ -838,7 +861,7 @@
         const src = M.getDecalColors(pieces[0].part) || {};
         let n = 0;
         pieces.slice(1).forEach((piece) => Object.keys(DECAL_CHANNEL_NAMES).forEach((ch) => {
-          if (src[ch] && M.setDecalColor(piece.part, ch, src[ch])) n++;
+          if (src[ch] && M.setDecalColor(piece.part, ch, src[ch], { allowUnset: true })) n++;
         }));
         edited(`Copied ${pieces[0].label.toLowerCase()} logo colors to ${n} swatch${n === 1 ? '' : 'es'}.`);
         rerender();

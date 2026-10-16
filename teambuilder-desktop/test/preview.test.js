@@ -140,6 +140,8 @@ test('every brand logo in the catalog has a preview', () => {
   for (const decal of data.catalog.decals) {
     const e = decals[decal.col.split('/').pop().toLowerCase()];
     assert.ok(e, `${decal.label} has a preview`);
+    assert.equal(e.channels[0], 'R', `${decal.label} lists its color areas, main first`);
+    assert.ok(e.channels.every((c) => ['R', 'G', 'B'].includes(c)));
     if (e.type === 'vector') {
       assert.ok(Object.keys(e.regions).length && Object.keys(e.regions).every((k) => ['R', 'G', 'B'].includes(k)), decal.label);
     } else {

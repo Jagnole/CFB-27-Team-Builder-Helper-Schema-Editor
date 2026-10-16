@@ -235,6 +235,9 @@ input[type=range] { accent-color: var(--accent); width: 100%; }
 .picker-empty { padding: 10px; color: var(--muted); font-size: 12px; }
 .picker-count { margin-top: 6px; font-size: 11px; color: var(--muted); }
 
+.link-btn { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--muted); font-size: 11px; text-decoration: underline; cursor: pointer; }
+.link-btn:hover { color: var(--accent-2); }
+
 /* custom image layers */
 .custom-layer { display: flex; gap: 12px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed rgba(36, 54, 74, 0.6); }
 .custom-layer:last-child { border-bottom: 0; }

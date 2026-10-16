@@ -222,3 +222,15 @@ test('editing colors, fonts and logos keeps every custom layer intact', () => {
   assert.deepEqual(M.checkCustomLayers(orig, p), []);
   assert.deepEqual(M.getPart(p, home, 'jersey').layerCompTexture.overlays.at(-1), M.getPart(orig, home, 'jersey').layerCompTexture.overlays.at(-1));
 });
+
+test('a logo second color can be filled in and cleared again', () => {
+  const p = load();
+  const pants = M.getPart(p, M.deriveVariants(p)[0], 'pants');
+  assert.equal(M.setDecalColor(pants, 'colorG', '#00ff00'), false, 'unset channels stay unset by default');
+  assert.equal(M.setDecalColor(pants, 'colorG', '#00ff00', { allowUnset: true }), true);
+  assert.equal(M.getDecalColors(pants).colorG, '#00ff00');
+  assert.equal(M.setDecalColor(pants, 'tintMode', '#00ff00', { allowUnset: true }), false, 'only color channels');
+  assert.equal(M.clearDecalColor(pants, 'colorG'), true);
+  assert.equal(M.getDecalColors(pants).colorG, null);
+  assert.deepEqual(M.changeReport(load(), p), [], 'back to the original');
+});
