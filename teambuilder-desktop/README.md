@@ -185,7 +185,11 @@ in `tb-data.json`:
 3. Add tuning from the jersey's partItem XML under `layoutProfiles`:
    `numberspacing` → `numberSpacing`, the `*numberoffset_scale` values, and
    `PlayerNumberAdjList` → `playerNumberAdjust`. Under `tintChannels`, list the
-   color channels the digits use.
+   color channels the digits use. Without the partItem XML,
+   `node tools/tune-number-spacing.js <texture path>` estimates the spacing
+   and the per-number list from the digit shapes. On known fonts it lands
+   within about 0.02 of the game's values. Don't use the item XML's
+   `PlayerDefaultNumberSpacing`: it can be a generic default.
 
 `npm test` checks that every listed font has a preview.
 

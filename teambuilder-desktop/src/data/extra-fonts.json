@@ -5,17 +5,96 @@
       "displayName": "ORE_Jersey_2026_Origin_Of_Speed_NUM_Array",
       "path": "content/characters/player/parts/uniforms/jerseys/numbers/ORE_Jersey_2026_Origin_Of_Speed_NUM_Array",
       "label": "Oregon (2026 Origin of Speed)",
-      "source": "U_ORE_JERSEY_2026_SPEED (Speed Jersey)"
+      "source": "U_ORE_JERSEY_2026_SPEED (Speed Jersey)",
+      "spacingSource": "Estimated with tools/tune-number-spacing.js (matches game values within ~0.02 on known fonts). The item file default of -0.51 overlaps these wider digits by ~19px. Replace with the partItem ORE_JERSEY_2026_SPEED values when available."
     }
   ],
   "layoutProfiles": {
     "ORE_Jersey_2026_Origin_Of_Speed_NUM_Array": {
-      "numberSpacing": -0.51
+      "numberSpacing": -0.3,
+      "playerNumberAdjust": [
+        {
+          "number": 10,
+          "width": -0.44
+        },
+        {
+          "number": 11,
+          "width": -0.55
+        },
+        {
+          "number": 12,
+          "width": -0.42
+        },
+        {
+          "number": 13,
+          "width": -0.42
+        },
+        {
+          "number": 14,
+          "width": -0.43
+        },
+        {
+          "number": 15,
+          "width": -0.42
+        },
+        {
+          "number": 16,
+          "width": -0.42
+        },
+        {
+          "number": 17,
+          "width": -0.42
+        },
+        {
+          "number": 18,
+          "width": -0.44
+        },
+        {
+          "number": 19,
+          "width": -0.42
+        },
+        {
+          "number": 21,
+          "width": -0.42
+        },
+        {
+          "number": 31,
+          "width": -0.42
+        },
+        {
+          "number": 41,
+          "width": -0.42
+        },
+        {
+          "number": 51,
+          "width": -0.42
+        },
+        {
+          "number": 61,
+          "width": -0.42
+        },
+        {
+          "number": 71,
+          "width": -0.42
+        },
+        {
+          "number": 81,
+          "width": -0.42
+        },
+        {
+          "number": 91,
+          "width": -0.42
+        }
+      ]
     }
   },
   "tintChannels": {
     "content/characters/player/parts/uniforms/jerseys/numbers/ore_jersey_2026_origin_of_speed_num_array": {
-      "channels": ["colorR", "colorG", "colorB"],
+      "channels": [
+        "colorR",
+        "colorG",
+        "colorB"
+      ],
       "sampleSize": 1,
       "distinct": true
     }

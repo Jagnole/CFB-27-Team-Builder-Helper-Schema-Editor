@@ -153,3 +153,24 @@ test('every brand logo in the catalog has a preview', () => {
     }
   }
 });
+
+test('added fonts are tuned to the same digit gap as in-game jerseys', () => {
+  const extra = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/extra-fonts.json'), 'utf8'));
+  for (const f of extra.fonts) {
+    const prof = data.numberLayoutProfiles[f.displayName];
+    const buf = zlib.gunzipSync(fs.readFileSync(path.join(previewDir, index[fontKey(f.path)].file)));
+    const rowsOf = (d) => Array.from({ length: P.DIGIT_SIZE }, (_, y) => {
+      let l = -1, r = -1;
+      for (let x = 0; x < P.DIGIT_SIZE; x++) if (buf[d * P.DIGIT_BYTES + (y * P.DIGIT_SIZE + x) * 4 + 3] > 96) { if (l < 0) l = x; r = x; }
+      return l < 0 ? null : [l, r];
+    });
+    const digits = Array.from({ length: 10 }, (_, d) => rowsOf(d));
+    for (let n = 10; n <= 99; n++) {
+      const a = digits[Math.floor(n / 10)], b = digits[n % 10];
+      const sep = P.digitSeparation(P.spacingForNumber(String(n), prof.numberSpacing, prof.playerNumberAdjust));
+      let gap = Infinity;
+      for (let y = 0; y < P.DIGIT_SIZE; y++) if (a[y] && b[y]) gap = Math.min(gap, sep + b[y][0] - a[y][1] - 1);
+      assert.ok(gap > 0 && gap < 12, `${f.label} #${n}: tightest gap ${gap.toFixed(1)}px`);
+    }
+  }
+});

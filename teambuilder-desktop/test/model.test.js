@@ -244,7 +244,7 @@ test('extra fonts join the catalog with their spacing and color slots', () => {
   const p = load();
   const jersey = M.getPart(p, M.deriveVariants(p)[0], 'jersey');
   assert.equal(M.applyNumberFont(jersey, font, data).ok, true);
-  assert.equal(M.getNumberSpacing(jersey), -0.51);
+  assert.equal(M.getNumberSpacing(jersey), data.numberLayoutProfiles[font.displayName].numberSpacing);
   assert.deepEqual(M.numberColorChannels(jersey, data), { channels: ['colorR', 'colorG', 'colorB'], confirmed: true });
   assert.equal(M.findFontByPath(data, M.currentNumberFontPath(jersey)).label, 'Oregon (2026 Origin of Speed)');
 });
