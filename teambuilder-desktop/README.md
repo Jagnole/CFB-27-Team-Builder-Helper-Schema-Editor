@@ -168,6 +168,27 @@ npm test
 This runs the editing logic against `test/fixtures/sample-team.json`, a trimmed
 real team.
 
+### Adding a new number font
+
+New fonts go in `src/data/extra-fonts.json`, apart from the extension's catalog
+in `tb-data.json`:
+
+1. Add an entry under `fonts`: the texture path (for example
+   `content/characters/player/parts/uniforms/jerseys/numbers/<Name>_NUM_Array`),
+   a display name, and a label.
+2. Add the preview from the font's texture, exported from Frosty as `.dds`:
+   ```
+   pip install texture2ddecoder
+   python tools/dds-digits.py <Name>_NUM_Array.dds digits-out
+   node tools/add-number-preview.js digits-out <texture path>
+   ```
+3. Add tuning from the jersey's partItem XML under `layoutProfiles`:
+   `numberspacing` → `numberSpacing`, the `*numberoffset_scale` values, and
+   `PlayerNumberAdjList` → `playerNumberAdjust`. Under `tintChannels`, list the
+   color channels the digits use.
+
+`npm test` checks that every listed font has a preview.
+
 ## How it works
 
 - `src/main.js`: the Electron main process.

@@ -6,7 +6,9 @@ const zlib = require('zlib');
 const M = require('../src/core/model.js');
 const P = require('../src/core/preview.js');
 
-const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/tb-data.json'), 'utf8'));
+const data = M.mergeExtraFonts(
+  JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/tb-data.json'), 'utf8')),
+  JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/extra-fonts.json'), 'utf8')));
 const previewDir = path.join(__dirname, '../src/assets/number-previews');
 const index = JSON.parse(fs.readFileSync(path.join(previewDir, 'index.json'), 'utf8'));
 const fontKey = (p) => p.replace('/uniforms/comp/', '/uniforms/').toLowerCase();

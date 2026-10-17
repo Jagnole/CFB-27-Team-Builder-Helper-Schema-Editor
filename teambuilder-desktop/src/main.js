@@ -2,6 +2,7 @@ const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electro
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const { mergeExtraFonts } = require('./core/model.js');
 
 const PREVIEW_DIR = path.join(__dirname, 'assets', 'number-previews');
 const DECAL_PREVIEW_DIR = path.join(__dirname, 'assets', 'decal-previews');
@@ -183,8 +184,12 @@ function samePath(a, b) {
 }
 
 function registerIpc() {
-  ipcMain.handle('tb:data', () =>
-    fs.readFileSync(path.join(__dirname, 'data', 'tb-data.json'), 'utf8'));
+  // Catalog data from extension v0.76 plus fonts added since (extra-fonts.json).
+  ipcMain.handle('tb:data', () => {
+    const data = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'tb-data.json'), 'utf8'));
+    const extra = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'extra-fonts.json'), 'utf8'));
+    return JSON.stringify(mergeExtraFonts(data, extra));
+  });
 
   ipcMain.handle('tb:number-preview-index', () =>
     fs.readFileSync(path.join(PREVIEW_DIR, 'index.json'), 'utf8'));

@@ -1,0 +1,23 @@
+{
+  "about": "Number fonts added after the extension v0.76 catalog (tb-data.json). Merged in at startup by mergeExtraFonts in src/core/model.js. Each font needs its texture path here, a preview from tools/dds-digits.py + tools/add-number-preview.js, and ideally a layout profile from the jersey's partItem XML.",
+  "fonts": [
+    {
+      "displayName": "ORE_Jersey_2026_Origin_Of_Speed_NUM_Array",
+      "path": "content/characters/player/parts/uniforms/jerseys/numbers/ORE_Jersey_2026_Origin_Of_Speed_NUM_Array",
+      "label": "Oregon (2026 Origin of Speed)",
+      "source": "U_ORE_JERSEY_2026_SPEED (Speed Jersey)"
+    }
+  ],
+  "layoutProfiles": {
+    "ORE_Jersey_2026_Origin_Of_Speed_NUM_Array": {
+      "numberSpacing": -0.51
+    }
+  },
+  "tintChannels": {
+    "content/characters/player/parts/uniforms/jerseys/numbers/ore_jersey_2026_origin_of_speed_num_array": {
+      "channels": ["colorR", "colorG", "colorB"],
+      "sampleSize": 1,
+      "distinct": true
+    }
+  }
+}

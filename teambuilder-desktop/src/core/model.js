@@ -207,6 +207,23 @@
   const isUsableFontPath = (p) => !!p && !/\/(numbers|name_fonts)\/?$/i.test(p) && !/_name_array$/i.test(p);
   const stripCompSegment = (p) => p.replace('/uniforms/comp/', '/uniforms/');
 
+  // Adds the fonts from src/data/extra-fonts.json to the catalog data (fonts
+  // that arrived after the extension v0.76 catalog). Existing paths win.
+  function mergeExtraFonts(data, extra) {
+    if (!extra) return data;
+    const jersey = data.catalog.numberFonts.jersey;
+    const known = new Set(listNumberFonts(data).map((f) => stripCompSegment(f.path).toLowerCase()));
+    (extra.fonts || []).forEach((f) => {
+      if (!f || !f.path || known.has(stripCompSegment(f.path).toLowerCase())) return;
+      jersey.push({ displayName: f.displayName, path: f.path, label: f.label });
+      known.add(stripCompSegment(f.path).toLowerCase());
+    });
+    jersey.sort((a, b) => String(a.label || a.displayName).localeCompare(String(b.label || b.displayName)));
+    Object.entries(extra.layoutProfiles || {}).forEach(([k, v]) => { if (!data.numberLayoutProfiles[k]) data.numberLayoutProfiles[k] = v; });
+    Object.entries(extra.tintChannels || {}).forEach(([k, v]) => { if (!data.numberFontTintChannels[k]) data.numberFontTintChannels[k] = v; });
+    return data;
+  }
+
   function listNumberFonts(data) {
     const nf = data.catalog.numberFonts;
     return [...nf.jersey, ...(nf.alts || [])].filter((e) => isUsableFontPath(e.path));
@@ -627,7 +644,7 @@
     unitToHex, hexToUnit,
     getTeamField, setTeamField, getTeamColor, setTeamColor, getPaletteColor, setPaletteColor,
     deriveVariants, getPart, partPath,
-    listNumberFonts, currentNumberFontPath, findFontByPath, applyNumberFont,
+    mergeExtraFonts, listNumberFonts, currentNumberFontPath, findFontByPath, applyNumberFont,
     numberColorChannels, getNumberColor, setNumberColor,
     getNumberSpacing, setNumberSpacing, getNumberSizePercent, setNumberSizePercent,
     applyHelmetShell, findShell, getFacemaskColor, setFacemaskColor,

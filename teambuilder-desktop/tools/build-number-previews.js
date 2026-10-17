@@ -22,12 +22,14 @@ if (!manifestPath || !digitsDir) {
 }
 
 const outDir = path.join(__dirname, '..', 'src', 'assets', 'number-previews');
-fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(outDir, { recursive: true });
 
 const normalize = (p) => p.replace('/uniforms/comp/', '/uniforms/').toLowerCase();
 const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-const index = {};
+// Keep fonts added since with tools/add-number-preview.js; this tool only
+// (re)writes the Offline Editor's fonts.
+const indexPath = path.join(outDir, 'index.json');
+const index = fs.existsSync(indexPath) ? JSON.parse(fs.readFileSync(indexPath, 'utf8')) : {};
 const written = new Map();
 let bytes = 0;
 
@@ -52,5 +54,5 @@ for (const [fontPath, info] of Object.entries(manifest.numberFonts)) {
   index[normalize(fontPath)] = { file, digits: written.get(info.set) };
 }
 
-fs.writeFileSync(path.join(outDir, 'index.json'), JSON.stringify(index));
+fs.writeFileSync(indexPath, JSON.stringify(index));
 console.log(`${Object.keys(index).length} fonts, ${written.size} files, ${(bytes / 1048576).toFixed(1)} MB`);

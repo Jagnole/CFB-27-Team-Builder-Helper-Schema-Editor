@@ -4,7 +4,9 @@ const fs = require('fs');
 const path = require('path');
 const M = require('../src/core/model.js');
 
-const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/tb-data.json'), 'utf8'));
+const data = M.mergeExtraFonts(
+  JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/tb-data.json'), 'utf8')),
+  JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/extra-fonts.json'), 'utf8')));
 const sampleText = fs.readFileSync(path.join(__dirname, 'fixtures/sample-team.json'), 'utf8');
 const load = () => M.parseTeamJson(sampleText);
 
@@ -233,4 +235,16 @@ test('a logo second color can be filled in and cleared again', () => {
   assert.equal(M.clearDecalColor(pants, 'colorG'), true);
   assert.equal(M.getDecalColors(pants).colorG, null);
   assert.deepEqual(M.changeReport(load(), p), [], 'back to the original');
+});
+
+test('extra fonts join the catalog with their spacing and color slots', () => {
+  const font = M.listNumberFonts(data).find((f) => f.displayName === 'ORE_Jersey_2026_Origin_Of_Speed_NUM_Array');
+  assert.ok(font, 'Oregon 2026 Origin of Speed is listed');
+  assert.equal(M.listNumberFonts(data).filter((f) => f.path === font.path).length, 1, 'listed once');
+  const p = load();
+  const jersey = M.getPart(p, M.deriveVariants(p)[0], 'jersey');
+  assert.equal(M.applyNumberFont(jersey, font, data).ok, true);
+  assert.equal(M.getNumberSpacing(jersey), -0.51);
+  assert.deepEqual(M.numberColorChannels(jersey, data), { channels: ['colorR', 'colorG', 'colorB'], confirmed: true });
+  assert.equal(M.findFontByPath(data, M.currentNumberFontPath(jersey)).label, 'Oregon (2026 Origin of Speed)');
 });
