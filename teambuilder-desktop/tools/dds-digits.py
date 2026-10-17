@@ -4,9 +4,10 @@
     python tools/dds-digits.py <font.dds> <out dir>
 
 Number fonts are texture arrays: layer N is digit N (0-9). Some fonts carry a
-second, mirrored set in layers 10-19; only 0-9 are needed for the preview.
-Writes <out dir>/0.rgba ... 9.rgba (raw 8-bit RGBA, top mip) plus meta.json with
-the size, ready for tools/add-number-preview.js.
+second set in layers 10-19, shaped for the left (tens) digit of a two-digit
+number, e.g. Oregon 2026 "Origin of Speed", whose digits taper inward like a
+shield. All 10 or 20 layers are written as <out dir>/<layer>.rgba (raw 8-bit
+RGBA, top mip) plus meta.json with the size, ready for tools/add-number-preview.js.
 """
 import json
 import os
@@ -43,7 +44,8 @@ def main(path, out):
         sys.exit(f'Expected at least 10 layers (digits 0-9); found {layers}.')
 
     os.makedirs(out, exist_ok=True)
-    for digit in range(10):
+    count = 20 if layers >= 20 and len(body) >= chain * 20 else 10
+    for digit in range(count):
         start = digit * chain
         bgra = decode(body[start:start + level_bytes(width, height)], width, height)
         rgba = bytearray(bgra)
@@ -53,7 +55,7 @@ def main(path, out):
     with open(os.path.join(out, 'meta.json'), 'w') as f:
         json.dump({'width': width, 'height': height, 'layers': layers, 'dxgi': dxgi,
                    'source': os.path.basename(path)}, f)
-    print(f'{width}x{height}, {layers} layers -> digits 0-9 in {out}')
+    print(f'{width}x{height}, {layers} layers -> {count} digit images in {out}')
 
 
 if __name__ == '__main__':

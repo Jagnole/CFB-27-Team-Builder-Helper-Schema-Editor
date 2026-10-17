@@ -28,8 +28,10 @@ const entry = index[fontPath.replace('/uniforms/comp/', '/uniforms/').toLowerCas
 if (!entry) throw new Error('No preview for that font yet; add it with tools/add-number-preview.js first.');
 const buf = zlib.gunzipSync(fs.readFileSync(path.join(dir, entry.file)));
 
-// Left/right ink edge of every row of every digit.
-const rows = Array.from({ length: 10 }, (_, d) => Array.from({ length: D }, (_, y) => {
+// Left/right ink edge of every row of every digit layer (20 when the font has
+// a separate left-digit set, see entry.leftSet).
+const leftSet = entry.leftSet || 0;
+const rows = Array.from({ length: leftSet ? leftSet + 10 : 10 }, (_, d) => Array.from({ length: D }, (_, y) => {
   let l = -1;
   let r = -1;
   for (let x = 0; x < D; x++) {
@@ -40,7 +42,7 @@ const rows = Array.from({ length: 10 }, (_, d) => Array.from({ length: D }, (_, 
 
 // Tightest gap at spacing 0 (digit centres one cell apart); spacing s moves them s*D closer.
 const gapAtZero = (n) => {
-  const a = rows[Math.floor(n / 10)];
+  const a = rows[Math.floor(n / 10) + leftSet];
   const b = rows[n % 10];
   let best = Infinity;
   for (let y = 0; y < D; y++) if (a[y] && b[y]) best = Math.min(best, P.digitSeparation(0) + b[y][0] - a[y][1] - 1);

@@ -182,6 +182,10 @@ in `tb-data.json`:
    python tools/dds-digits.py <Name>_NUM_Array.dds digits-out
    node tools/add-number-preview.js digits-out <texture path>
    ```
+   If the texture has 20 layers, check whether layers 10-19 are a second set
+   for the left (tens) digit. Oregon 2026 "Origin of Speed" has one: its digits
+   taper inward like a shield. If so, add `--left-set 10` so the preview draws
+   the tens digit from that set.
 3. Add tuning from the jersey's partItem XML under `layoutProfiles`:
    `numberspacing` → `numberSpacing`, the `*numberoffset_scale` values, and
    `PlayerNumberAdjList` → `playerNumberAdjust`. Under `tintChannels`, list the

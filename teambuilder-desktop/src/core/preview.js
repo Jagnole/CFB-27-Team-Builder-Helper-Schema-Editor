@@ -110,8 +110,10 @@
     }
   }
 
-  // opts: number ("27"), digits (Uint8Array of ten 120x120 RGBA digits back to back),
-  // available (digit list), colors ([R, G, B] hex), background (hex),
+  // opts: number ("27"), digits (Uint8Array of 120x120 RGBA digit layers back to back),
+  // available (layer list), leftSet (first layer of a separate set used for the
+  // left digit of two-digit numbers, e.g. 10; shield-shaped fonts like Oregon
+  // 2026 have one), colors ([R, G, B] hex), background (hex),
   // spacing (stored numberSpacing.x), numberAdjust (stored playerNumberAdjust),
   // scaleZ / scaleW (stored offsetScale z / w).
   // Returns { pixels, width, height, missing, spacing }.
@@ -134,7 +136,8 @@
     const available = opts.available || [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
     number.split('').forEach((ch, idx) => {
-      const d = Number(ch);
+      const left = number.length === 2 && idx === 0 && opts.leftSet ? opts.leftSet : 0;
+      const d = Number(ch) + left;
       if (!available.includes(d) || opts.digits.length < (d + 1) * DIGIT_BYTES) { missing.push(ch); return; }
       drawDigit(px, width, height, opts.digits, d * DIGIT_BYTES, positions[idx], cy, colors, sx, sy);
     });

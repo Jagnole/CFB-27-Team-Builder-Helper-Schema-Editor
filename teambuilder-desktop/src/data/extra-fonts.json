@@ -6,7 +6,8 @@
       "path": "content/characters/player/parts/uniforms/jerseys/numbers/ORE_Jersey_2026_Origin_Of_Speed_NUM_Array",
       "label": "Oregon (2026 Origin of Speed)",
       "source": "U_ORE_JERSEY_2026_SPEED (Speed Jersey)",
-      "spacingSource": "Estimated with tools/tune-number-spacing.js (matches game values within ~0.02 on known fonts). The item file default of -0.51 overlaps these wider digits by ~19px. Replace with the partItem ORE_JERSEY_2026_SPEED values when available."
+      "spacingSource": "Estimated with tools/tune-number-spacing.js (matches game values within ~0.02 on known fonts). The item file default of -0.51 overlaps these wider digits by ~19px. Replace with the partItem ORE_JERSEY_2026_SPEED values when available.",
+      "notes": "Shield-shaped font: texture layers 10-19 are the left (tens) digit, 0-9 the right digit and single digits."
     }
   ],
   "layoutProfiles": {
@@ -15,19 +16,19 @@
       "playerNumberAdjust": [
         {
           "number": 10,
-          "width": -0.44
+          "width": -0.4
         },
         {
           "number": 11,
-          "width": -0.55
+          "width": -0.6
         },
         {
           "number": 12,
-          "width": -0.42
+          "width": -0.39
         },
         {
           "number": 13,
-          "width": -0.42
+          "width": -0.39
         },
         {
           "number": 14,
@@ -35,23 +36,23 @@
         },
         {
           "number": 15,
-          "width": -0.42
+          "width": -0.39
         },
         {
           "number": 16,
-          "width": -0.42
+          "width": -0.4
         },
         {
           "number": 17,
-          "width": -0.42
+          "width": -0.45
         },
         {
           "number": 18,
-          "width": -0.44
+          "width": -0.4
         },
         {
           "number": 19,
-          "width": -0.42
+          "width": -0.39
         },
         {
           "number": 21,
@@ -79,7 +80,7 @@
         },
         {
           "number": 81,
-          "width": -0.42
+          "width": -0.43
         },
         {
           "number": 91,

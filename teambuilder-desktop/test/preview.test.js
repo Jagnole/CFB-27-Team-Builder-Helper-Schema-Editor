@@ -164,13 +164,31 @@ test('added fonts are tuned to the same digit gap as in-game jerseys', () => {
       for (let x = 0; x < P.DIGIT_SIZE; x++) if (buf[d * P.DIGIT_BYTES + (y * P.DIGIT_SIZE + x) * 4 + 3] > 96) { if (l < 0) l = x; r = x; }
       return l < 0 ? null : [l, r];
     });
-    const digits = Array.from({ length: 10 }, (_, d) => rowsOf(d));
+    const entry = index[fontKey(f.path)];
+    const leftSet = entry.leftSet || 0;
+    const digits = Array.from({ length: leftSet ? leftSet + 10 : 10 }, (_, d) => rowsOf(d));
     for (let n = 10; n <= 99; n++) {
-      const a = digits[Math.floor(n / 10)], b = digits[n % 10];
+      const a = digits[Math.floor(n / 10) + leftSet], b = digits[n % 10];
       const sep = P.digitSeparation(P.spacingForNumber(String(n), prof.numberSpacing, prof.playerNumberAdjust));
       let gap = Infinity;
       for (let y = 0; y < P.DIGIT_SIZE; y++) if (a[y] && b[y]) gap = Math.min(gap, sep + b[y][0] - a[y][1] - 1);
       assert.ok(gap > 0 && gap < 12, `${f.label} #${n}: tightest gap ${gap.toFixed(1)}px`);
     }
   }
+});
+
+test('two-digit numbers take the tens digit from the left set when a font has one', () => {
+  const buf = new Uint8Array(P.DIGIT_BYTES * 20);
+  // layer 2 (right set) fills red, layer 12 (left set) fills green
+  for (const [layer, c] of [[2, 0], [12, 1]]) {
+    for (let i = 0; i < P.DIGIT_SIZE * P.DIGIT_SIZE; i++) { buf[layer * P.DIGIT_BYTES + i * 4 + c] = 255; buf[layer * P.DIGIT_BYTES + i * 4 + 3] = 255; }
+  }
+  const avail = [...Array(20).keys()];
+  const colors = ['#ff0000', '#00ff00', '#0000ff'];
+  const two = P.renderNumber({ number: '22', digits: buf, available: avail, leftSet: 10, colors, background: '#000000', spacing: -0.45 });
+  const y = Math.round(two.height * 0.48);
+  assert.deepEqual(pixel(two, 100, y), [0, 255, 0], 'left digit from layer 12');
+  assert.deepEqual(pixel(two, 220, y), [255, 0, 0], 'right digit from layer 2');
+  const one = P.renderNumber({ number: '2', digits: buf, available: avail, leftSet: 10, colors, background: '#000000' });
+  assert.deepEqual(pixel(one, 160, y), [255, 0, 0], 'single digits use the base set');
 });

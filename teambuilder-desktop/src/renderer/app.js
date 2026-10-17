@@ -477,7 +477,8 @@
       };
     };
     const render = (params, digits, entry, size) => P.renderNumber({
-      number: state.previewNumber, digits, available: entry && entry.digits, colors: colors(), background: background(),
+      number: state.previewNumber, digits, available: entry && entry.digits, leftSet: entry && entry.leftSet,
+      colors: colors(), background: background(),
       spacing: params.spacing, numberAdjust: params.numberAdjust,
       scaleZ: params.scale && params.scale.z, scaleW: params.scale && params.scale.w,
       width: size && size[0], height: size && size[1],

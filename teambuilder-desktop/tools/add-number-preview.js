@@ -1,8 +1,10 @@
 // Adds one number font's preview digits to src/assets/number-previews/.
 //
-//   node tools/add-number-preview.js <digits dir> <font texture path>
+//   node tools/add-number-preview.js <digits dir> <font texture path> [--left-set 10]
 //
-// <digits dir> is the output of tools/dds-digits.py (0.rgba ... 9.rgba + meta.json).
+// <digits dir> is the output of tools/dds-digits.py (<layer>.rgba + meta.json).
+// --left-set 10: the font has a second set of digits in layers 10-19 for the
+// left (tens) digit of two-digit numbers (check which set tapers on which side).
 // The digits are resampled to the 120x120 preview size (area average, alpha
 // weighted so transparent edges don't bleed) and packed like the rest, and
 // index.json gains an entry for the font path. Other fonts are left alone.
@@ -11,7 +13,10 @@ const path = require('path');
 const zlib = require('zlib');
 
 const SIZE = 120;
-const [digitsDir, fontPath] = process.argv.slice(2);
+const args = process.argv.slice(2);
+const flag = args.indexOf('--left-set');
+const leftSet = flag >= 0 ? Number(args.splice(flag, 2)[1]) : 0;
+const [digitsDir, fontPath] = args;
 if (!digitsDir || !fontPath || !/\/numbers\/[^/]+_NUM_Array$/i.test(fontPath)) {
   console.error('usage: node tools/add-number-preview.js <digits dir> <content/.../numbers/<Name>_NUM_Array>');
   process.exit(1);
@@ -64,9 +69,10 @@ function resample(src, w, h) {
   return out;
 }
 
-const packed = Buffer.alloc(SIZE * SIZE * 4 * 10);
+const layers = leftSet ? leftSet + 10 : 10;
+const packed = Buffer.alloc(SIZE * SIZE * 4 * layers);
 const digits = [];
-for (let d = 0; d < 10; d++) {
+for (let d = 0; d < layers; d++) {
   const file = path.join(digitsDir, `${d}.rgba`);
   if (!fs.existsSync(file)) continue;
   const src = fs.readFileSync(file);
@@ -81,6 +87,6 @@ const file = `${name}.gz`;
 fs.writeFileSync(path.join(outDir, file), zlib.gzipSync(packed, { level: 9 }));
 const indexPath = path.join(outDir, 'index.json');
 const index = JSON.parse(fs.readFileSync(indexPath, 'utf8'));
-index[fontPath.replace('/uniforms/comp/', '/uniforms/').toLowerCase()] = { file, digits };
+index[fontPath.replace('/uniforms/comp/', '/uniforms/').toLowerCase()] = leftSet ? { file, digits, leftSet } : { file, digits };
 fs.writeFileSync(indexPath, JSON.stringify(index));
-console.log(`${name}: digits ${digits.join(',')} -> ${file}`);
+console.log(`${name}: layers ${digits.join(',')}${leftSet ? ` (left digit set starts at ${leftSet})` : ''} -> ${file}`);
