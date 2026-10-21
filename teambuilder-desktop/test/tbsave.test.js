@@ -139,3 +139,13 @@ test('per-number spacing in a save: fonts set every number, the slider shifts th
   const r = TbSave.applyView(pkg.plain, view.leaves, payload);
   assert.deepEqual(r.problems, []);
 });
+
+test('embedded images over 1 MB decode (only list and map counts are capped)', () => {
+  const big = new Uint8Array(2222213);
+  big.set([0x89, 0x50, 0x4e, 0x47], 0);
+  const root = { t: Tdf.T.STRUCT, fields: [{ tag: 'BDAT', node: { t: Tdf.T.BLOB, bytes: big } }] };
+  const back = Tdf.decode(Tdf.encode(root));
+  assert.equal(back.fields[0].node.size, big.length);
+  const tooLong = Tdf.encode(root).subarray(0, 1000);
+  assert.throws(() => Tdf.decode(tooLong), /ends early/);
+});

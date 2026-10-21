@@ -554,7 +554,7 @@
     }, { root: grid, rootMargin: '120px' });
 
     const applyFont = (font) => {
-      const res = M.applyNumberFont(jersey, font, d);
+      const res = M.applyNumberFont(jersey, font, d, { fixedLists: state.source && state.source.kind === 'tbsave' });
       if (!res.ok) { toast(res.message, 'err'); return; }
       edited(`Number font → ${fontLabel(font)}` + (res.profileApplied.length ? ' (with its spacing and placement)' : ''));
       toast(res.profileApplied.length

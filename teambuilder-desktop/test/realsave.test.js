@@ -42,7 +42,12 @@ test('real save: every editor finds its fields, and edits survive save + reload'
   assert.equal(untouched.changed, 0);
 
   M.setTeamField(p, 'TEAM_NICKNAME', 'Testers');
-  M.applyNumberFont(jersey, M.listNumberFonts(data)[0], data);
+  // Every uniform: some saves carry a full 10-99 list, others a short one.
+  const withList = M.listNumberFonts(data).find((f) => (data.numberLayoutProfiles[f.displayName] || {}).playerNumberAdjust);
+  variants.forEach((x) => {
+    const j = M.getPart(p, x, 'jersey');
+    if (j && j.numberComp) assert.equal(M.applyNumberFont(j, withList, data, { fixedLists: true }).ok, true);
+  });
   M.setNumberColor(jersey, 'colorR', '#123456');
   M.applyVendorDecal(p, v, data.catalog.decals[0], data);
   M.setFacemaskColor(helmet, '#654321');

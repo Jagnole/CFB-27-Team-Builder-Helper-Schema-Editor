@@ -249,7 +249,9 @@
     return listNumberFonts(data).find((f) => stripCompSegment(f.path).toLowerCase() === norm) || null;
   }
 
-  function applyNumberFont(part, font, data) {
+  // opts.fixedLists: the file can't add or remove list entries (TEAMBUILDER
+  // save files), so per-number spacing is updated in place.
+  function applyNumberFont(part, font, data, opts = {}) {
     const path = stripCompSegment(font.path);
     const okA = setDeep(part, ['numberComp', 'arrayTexture', 'textureId'], path);
     const okO = setDeep(part, ['numberComp', 'overlays', 0, 'textures', 'color', 'textureId'], path);
@@ -266,13 +268,17 @@
         }
       });
       const list = getDeep(part, ['numberMaterialSettings', 'playerNumberAdjust']);
-      if (isFullNumberList(list) && (profile.playerNumberAdjust || typeof profile.numberSpacing === 'number')) {
-        // Save files hold a width for every number 10-99 and the game uses those,
-        // so set each one: the font's own value where it has one, else its base spacing.
+      const inPlace = Array.isArray(list) && (opts.fixedLists || isFullNumberList(list));
+      if (inPlace && (profile.playerNumberAdjust || typeof profile.numberSpacing === 'number')) {
+        // Update the numbers the list already has (save files can't add entries;
+        // most hold all of 10-99): the font's own width where it has one, else
+        // its base spacing.
         const own = new Map((profile.playerNumberAdjust || []).map((a) => [a.number, a.width]));
         const base = typeof profile.numberSpacing === 'number' ? profile.numberSpacing : getNumberSpacing(part);
-        list.forEach((e) => { e.width = own.has(e.number) ? own.get(e.number) : base; });
-        applied.push('per-number kerning');
+        list.forEach((e) => { if (e && typeof e.width === 'number') e.width = own.has(e.number) ? own.get(e.number) : base; });
+        const listed = new Set(list.map((e) => e && e.number));
+        const left = [...own.keys()].filter((n) => !listed.has(n));
+        applied.push(left.length ? `per-number kerning (${left.length} of the font's numbers aren't in this file's list and use the base spacing)` : 'per-number kerning');
       } else if (profile.playerNumberAdjust &&
           setDeep(part, ['numberMaterialSettings', 'playerNumberAdjust'], clone(profile.playerNumberAdjust))) {
         applied.push('per-number kerning');

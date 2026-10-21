@@ -88,9 +88,17 @@
       }
       return neg ? -v : v;
     };
+    // Entries in a list or map: capped to catch corrupt data.
     const count = () => {
       const n = readInt();
       if (n < 0 || n >= MAX_COUNT) throw new Error(`Unreasonable TDF count ${n} at byte ${p}.`);
+      return n;
+    };
+    // Bytes in a string or blob: embedded logos can be several MB, so these are
+    // only checked against what's left in the data (take() does that).
+    const length = () => {
+      const n = readInt();
+      if (n < 0) throw new Error(`Negative TDF length at byte ${p}.`);
       return n;
     };
 
@@ -99,13 +107,13 @@
       switch (t) {
         case T.INT: return { t, v: readInt(), s: start, e: p };
         case T.STRING: {
-          const n = count();
+          const n = length();
           const b = take(n);
           if (!n || b[n - 1] !== 0) throw new Error(`Unterminated TDF string at byte ${start}.`);
           return { t, v: utf8d.decode(b.subarray(0, n - 1)), s: start, e: p };
         }
         case T.BLOB: {
-          const n = count();
+          const n = length();
           const b = take(n);
           return { t, size: n, bytes: b, s: start, e: p };
         }
