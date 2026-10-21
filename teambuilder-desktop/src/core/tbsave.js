@@ -16,59 +16,104 @@
 
   const { T } = Tdf;
 
-  // Tag -> JSON key, where the tag always means the same thing.
+  // Tag -> JSON key, read off a real TEAMBUILDER save next to the website JSON
+  // of the same structures. Tags whose meaning depends on where they sit are
+  // handled in nameFor().
   const NAMES = {
-    TDAT: 'teamData', TINF: 'teamInfos', TMDA: 'metadata', FDAT: 'frostbiteData',
-    TEXT: 'textures', BDAT: 'data', TMUF: 'uniformParts',
-    JRSY: 'jerseys', HELM: 'helmets', PANT: 'pants', SOCK: 'socks',
-    LCTX: 'layerCompTexture', MATE: 'materials', MOVE: 'overlays', OVLS: 'overlays', CIDM: 'cidMaskLayers',
-    TXTS: 'textures', TXID: 'textureId', NORM: 'normal', TRSM: 'rsm',
-    NMER: 'numberComp', ARTX: 'arrayTexture', NMST: 'numberMaterialSettings', OSPC: 'offsetScaleSpacing',
+    // file and team
+    DMAP: 'dataMappings', TDAT: 'teamData', TMDA: 'metadata', TINF: 'teamInfos', ROST: 'roster', LGOS: 'logos',
+    FDAT: 'frostbiteData', TEXT: 'textures', BDAT: 'data', TVIZ: 'teamVisuals', CVIZ: 'characterVisuals',
+    CUNI: 'characterUniformItems', TMUF: 'uniformParts', FILD: 'field', STRC: 'stadiumRecipe', STAU: 'stadiumAudio',
+    SVIZ: 'stadiumVisuals', CABS: 'characterAbilities', STPS: 'stripeOuts',
+    // team visuals
+    ASSN: 'assetName', PREF: 'prefixName', ORID: 'origId', FUNI: 'fetchUniforms', TPAL: 'teamPalette',
+    CPAL: 'crowdPalette', CPWG: 'crowdPaletteWeights', PCCN: 'primaryColorChance', SCCN: 'secondaryColorChance',
+    TCCN: 'tertiaryColorChance', QCCN: 'quaternaryColorChance', LUNI: 'uniforms', DPLN: 'displayName',
+    COFF: 'currentOfficial', ICUS: 'isCustom', UNIS: 'uniform', LTYP: 'loadoutType', LCAT: 'loadoutCategory',
+    LELS: 'loadoutElements', TMSP: 'primaryColor', TMSS: 'secondaryColor', TMST: 'tertiaryColor',
+    TMSQ: 'quaternaryColor', CLOK: 'colorLookup', CCHN: 'colorChannels',
+    // uniform parts
+    JRSY: 'jerseys', HELM: 'helmets', PANT: 'pants', SOCK: 'socks', NAME: 'name', MAPR: 'materialPreset',
+    SHMT: 'shellMaterial', ACMT: 'accMaterial', FKMT: 'facemaskMaterial', USCL: 'underSockColor',
+    FCMP: 'fontComp', NMST: 'numberMaterialSettings', HMST: 'helmetMaterialSettings', FMCL: 'faceMaskColor',
+    NITX: 'nameplateIndirectTexture', NIPL: 'nameplateIndirectPlacement',
+    LCTX: 'layerCompTexture', CIDM: 'cidMaskLayers', MATE: 'materials', MATS: 'materials', MOVE: 'overlays',
+    OVLS: 'overlays', ARTX: 'arrayTexture', CIDT: 'maskCid', MCID: 'maskCid',
+    RMID: 'redMaterialId', GMID: 'greenMaterialId', BMID: 'blueMaterialId', CMID: 'cyanMaterialId',
+    MMID: 'magentaMaterialId', YMID: 'yellowMaterialId',
+    // layers
+    INFO: 'info', LABL: 'label', SLOT: 'slot', TXTS: 'textures', TXID: 'textureId', TYPE: 'sourceType',
+    LAYT: 'layout', NORM: 'normal', TRSM: 'rsm', IMAK: 'isMask', HSAO: 'hasAo',
+    RSMS: 'rsm', RSMR: 'rsmR', RSMG: 'rsmG', RSMB: 'rsmB', REFL: 'reflectance', SMTH: 'smoothness', MMSK: 'metalMask',
+    TINT: 'tint', TMOD: 'tintMode', BLND: 'blend', NORB: 'normal', RDMB: 'rsm', OCCB: 'occ', BMOD: 'colorBlendMode',
+    TRFM: 'transform', OFFS: 'offset', SCAL: 'scale', ROTA: 'rotate', CLUV: 'clampUv', STRN: 'scaledTransform',
+    UPOS: 'u', VPOS: 'v', VECX: 'x', VECY: 'y', VECZ: 'z', VECW: 'w',
+    // numbers
+    HSSH: 'hasShoulder', HSSL: 'hasSleeve', NUMS: 'numberSelection', OSPC: 'offsetScaleSpacing',
     NUSP: 'numberSpacing', CNOS: 'chestNumberOffsetScale', BNOS: 'backNumberOffsetScale',
-    SNOS: 'shoulderNumberOffsetScale', LNOS: 'sleeveNumberOffsetScale',
-    VECX: 'x', VECY: 'y', VECZ: 'z', VECW: 'w',
-    TINT: 'tint', TRFM: 'transform', SCAL: 'scale', OFFS: 'offset', STRN: 'scaledTransform', UPOS: 'u', VPOS: 'v',
-    SHMT: 'shellMaterial', ACMT: 'accMaterial',
+    SNOS: 'shoulderNumberOffsetScale', LNOS: 'sleeveNumberOffsetScale', FNOS: 'frontNumberOffsetScale',
+    PNAD: 'playerNumberAdjust', NUMB: 'number', WITH: 'width',
+    BRSM: 'backNumberRsm', SRSM: 'sleeveNumberRsm', SHNR: 'shoulderNumberRsm', NRSM: 'numberRsm',
+    BKNM: 'hasBackNumber', FKNM: 'hasFrontNumber',
   };
+  // Int tags the JSON shows as true/false.
+  const BOOLS = new Set(['HSSH', 'HSSL', 'HSAO', 'IMAK', 'COFF', 'ICUS', 'BKNM', 'FKNM', 'FUNI']);
   const RGB = { COLR: 0, COLG: 1, COLB: 2 };
 
-  // COLR/COLG/COLB depend on where they sit: a texture slot, a tint channel, or a color component.
   function nameFor(tag, parents) {
     const parent = parents[parents.length - 1];
     const grand = parents[parents.length - 2];
     if (tag in RGB) {
       if (parent === 'TXTS' && tag === 'COLR') return 'color';
+      if (parent === 'BLND' && tag === 'COLB') return 'color';
       if (parent === 'TINT') return ['colorR', 'colorG', 'colorB'][RGB[tag]];
-      if (grand === 'TINT' && parent in RGB) return ['r', 'g', 'b'][RGB[tag]];
+      if ((grand === 'TINT' && parent in RGB) || parent === 'FMCL' || parent === 'USCL') return ['r', 'g', 'b'][RGB[tag]];
       return tag;
     }
+    if (tag === 'FMST') return parent === 'HELM' ? 'facemaskMaterialSettings' : 'fontMaterialSettings';
+    if (tag === 'FRSM') return parent === 'FMST' ? 'faceMaskRsm' : 'frontNumberRsm';
+    if (tag === 'NMER') return parent === 'HELM' ? 'number' : 'numberComp';
+    if (tag === 'TXID' && parent === 'CIDM') return 'mask';
     return NAMES[tag] || tag;
   }
+
+  const PNG = [0x89, 0x50, 0x4e, 0x47];
+  const base64 = (bytes) => (typeof Buffer !== 'undefined'
+    ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.length).toString('base64')
+    : btoa(Array.from(bytes, (b) => String.fromCharCode(b)).join('')));
 
   // ---------- save -> view ----------
   function toView(rootNode) {
     const leaves = [];
-    function view(node, tags, path) {
+    function view(node, tags, path, tag) {
       switch (node.t) {
-        case T.INT: case T.FLOAT: case T.STRING:
+        case T.INT:
+          if (BOOLS.has(tag)) { leaves.push({ path, node, bool: true }); return node.v !== 0; }
           leaves.push({ path, node });
           return node.v;
-        case T.BLOB: return { embeddedBytes: node.size };
+        case T.FLOAT: case T.STRING:
+          leaves.push({ path, node });
+          return node.v;
+        case T.BLOB: {
+          // Embedded images (uploaded logos) are PNG files; show them, never edit them.
+          const isPng = node.bytes && PNG.every((b, i) => node.bytes[i] === b);
+          return isPng ? { embeddedBytes: node.size, png: `data:image/png;base64,${base64(node.bytes)}` } : { embeddedBytes: node.size };
+        }
         case T.STRUCT: {
           const obj = {};
           node.fields.forEach(({ tag, node: child }) => {
             let key = nameFor(tag, tags);
             if (key in obj) key = `${tag}#${Object.keys(obj).filter((k) => k.startsWith(tag)).length}`;
-            obj[key] = view(child, tags.concat(tag), path.concat(key));
+            obj[key] = view(child, tags.concat(tag), path.concat(key), tag);
           });
           return obj;
         }
-        case T.LIST: return node.items.map((item, i) => view(item, tags, path.concat(i)));
+        case T.LIST: return node.items.map((item, i) => view(item, tags, path.concat(i), tag));
         case T.MAP: {
           const obj = {};
           node.entries.forEach(({ k, v }) => {
             const key = String(k.v !== undefined ? k.v : `#${Object.keys(obj).length}`);
-            obj[key] = view(v, tags, path.concat(key));
+            obj[key] = view(v, tags, path.concat(key), tag);
           });
           return obj;
         }
@@ -100,8 +145,9 @@
   function applyView(plain, leaves, payload) {
     const edits = [];
     const problems = [];
-    leaves.forEach(({ path, node }) => {
+    leaves.forEach(({ path, node, bool }) => {
       const cur = getAt(payload, path);
+      if (bool && typeof cur === 'boolean' && cur === (node.v !== 0)) return;
       if (close(cur, node.v)) return;
       const where = path.join('.');
       if (node.t === T.STRING) {
@@ -133,7 +179,10 @@
   }
 
   // ---------- view -> new save (test fixtures only) ----------
-  const REVERSE = Object.fromEntries(Object.entries(NAMES).filter(([t]) => t !== 'OVLS' && t !== 'TEXT').map(([t, n]) => [n, t]));
+  const REVERSE = {
+    ...Object.fromEntries(Object.entries(NAMES).filter(([t]) => !['OVLS', 'TEXT', 'MATS', 'MCID'].includes(t)).map(([t, n]) => [n, t])),
+    numberComp: 'NMER', fontMaterialSettings: 'FMST', facemaskMaterialSettings: 'FMST', frontNumberRsm: 'FRSM', faceMaskRsm: 'FRSM',
+  };
   const MAPS = new Set(['teamInfos', 'metadata', 'jerseys', 'helmets', 'pants', 'socks']);
 
   function fromJson(obj) {
@@ -144,6 +193,10 @@
       if (parent === 'TINT' && /^color[RGB]$/.test(key)) return `COL${key.slice(-1)}`;
       if (grand === 'TINT' && parent in RGB && /^[rgb]$/.test(key)) return `COL${key.toUpperCase()}`;
       if (key === 'overlays' && parent === 'NMER') return 'OVLS';
+      if (key === 'materials' && parent === 'NMER') return 'MATS';
+      if (key === 'number' && parent === 'HELM') return 'NMER';
+      if (key === 'color' && parent === 'BLND') return 'COLB';
+      if ((parent === 'FMCL' || parent === 'USCL') && /^[rgb]$/.test(key)) return `COL${key.toUpperCase()}`;
       if (key === 'textures' && parent === 'FDAT') return 'TEXT';
       if (REVERSE[key]) return REVERSE[key];
       if (/^[A-Z ]{1,4}$/.test(key)) return key;

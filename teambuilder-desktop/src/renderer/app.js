@@ -93,13 +93,19 @@
     return state.payload ? M.changeReport(state.original, state.payload) : [];
   }
 
-  function teamLogoUrl(payload) {
+  // A team logo's image: the copy embedded in a save file when there is one,
+  // otherwise its link on EA's CDN.
+  function logoUrl(payload, key = 'TEAM_PRIMARY_LOGO') {
     try {
-      const raw = M.getDeep(payload, ['teamData', 'teamInfos', 'TEAM_PRIMARY_LOGO']);
-      const url = raw && JSON.parse(raw).pngUrl;
-      return typeof url === 'string' && url.startsWith('https://cdn.mcr.ea.com/') ? url : null;
+      const raw = M.getDeep(payload, ['teamData', 'teamInfos', key]);
+      const info = raw ? JSON.parse(raw) : null;
+      if (!info) return null;
+      const embedded = info.textureId && M.getDeep(payload, ['teamData', 'frostbiteData', 'textures', info.textureId, 'data', 'png']);
+      if (embedded) return embedded;
+      return typeof info.pngUrl === 'string' && info.pngUrl.startsWith('https://cdn.mcr.ea.com/') ? info.pngUrl : null;
     } catch { return null; }
   }
+  const teamLogoUrl = (payload) => logoUrl(payload);
 
   function refreshChrome() {
     const p = state.payload;
@@ -371,12 +377,10 @@
     };
 
     const logos = ['TEAM_PRIMARY_LOGO', 'TEAM_SECONDARY_LOGO'].map((k) => {
-      try {
-        const url = JSON.parse(M.getTeamField(p, k)).pngUrl;
-        return url && url.startsWith('https://cdn.mcr.ea.com/')
-          ? h('div', null, h('img', { class: 'logo-preview', src: url, alt: k }), h('div', { class: 'small muted', text: k === 'TEAM_PRIMARY_LOGO' ? 'Primary' : 'Secondary' }))
-          : null;
-      } catch { return null; }
+      const url = logoUrl(p, k);
+      return url
+        ? h('div', null, h('img', { class: 'logo-preview', src: url, alt: k }), h('div', { class: 'small muted', text: k === 'TEAM_PRIMARY_LOGO' ? 'Primary' : 'Secondary' }))
+        : null;
     }).filter(Boolean);
 
     return h('div', null,
@@ -958,7 +962,8 @@
           h('div', { class: 'custom-thumb' }, l.url ? h('img', { src: l.url, alt: '', loading: 'lazy' }) : h('span', { class: 'small', text: l.embedded ? 'in save' : 'missing' })),
           h('div', { class: 'grow' },
             h('div', { text: `${keys.get(l.key)} · ${l.label}` }),
-            h('div', { class: 'small muted', text: l.rsm ? `Metal ${pct(metal || 0)} · Smoothness ${pct(l.rsm.smoothness || 0)} · Reflectance ${pct(l.rsm.reflectance || 0)}` : 'Default finish' }),
+            // Save files mark an unset finish with -1 values.
+            h('div', { class: 'small muted', text: l.rsm && metal !== null && metal >= 0 ? `Metal ${pct(metal)} · Smoothness ${pct(l.rsm.smoothness || 0)} · Reflectance ${pct(l.rsm.reflectance || 0)}` : 'Default finish' }),
             metal !== null && metal >= 0.5
               ? h('div', { class: 'small warn-text', text: 'Mostly metallic: it reflects its surroundings more than it shows its own colors, so previews with little lighting (like Frosty\'s) can show it as a gray shape.' })
               : null,

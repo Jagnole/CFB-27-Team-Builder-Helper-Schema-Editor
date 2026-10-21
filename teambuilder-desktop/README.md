@@ -114,10 +114,16 @@ save file**; **Open file** also recognizes a save by its header.
   exact spot. The team data is recompressed into the same space with the same
   header and file size, then unpacked again and compared with what's on screen
   before anything is written.
-- Some things a save file can't take, such as fields it doesn't already have
-  or new list entries (per-number spacing, for example). Editors skip those on
+- Saves keep a width for every number 10–99 (the website JSON lists only the
+  exceptions). Applying a font sets all 90, and the spacing slider moves them
+  together, so each number keeps its tuning.
+- Uploaded logos are embedded in the save; the app shows them from the file.
+- A save can't take new fields or new list entries. Editors skip those on
   save files. If something still can't be stored, the save is refused with a
   list of what and why; nothing is dropped silently.
+- Tested against a real TEAMBUILDER save: it decodes and re-encodes byte for
+  byte, and edits survive saving and reloading. To check another save, run
+  `TB_SAVE=path/to/save npm test`.
 
 ## Themes
 

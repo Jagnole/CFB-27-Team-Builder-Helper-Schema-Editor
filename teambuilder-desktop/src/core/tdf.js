@@ -106,8 +106,8 @@
         }
         case T.BLOB: {
           const n = count();
-          take(n);
-          return { t, size: n, s: start, e: p };
+          const b = take(n);
+          return { t, size: n, bytes: b, s: start, e: p };
         }
         case T.STRUCT: return { t, fields: fields(false), s: start, e: p };
         case T.LIST: {
@@ -151,25 +151,32 @@
   }
 
   // ---------- encode (used to build test packages; edits are spliced) ----------
-  function encodeValue(node, out) {
-    switch (node.t) {
-      case T.INT: out.push(...encodeInt(node.v)); break;
-      case T.STRING: out.push(...encodeString(node.v)); break;
-      case T.BLOB: out.push(...encodeInt(node.bytes.length), ...node.bytes); break;
-      case T.STRUCT: encodeFields(node.fields, out); out.push(0); break;
-      case T.LIST: out.push(node.et, ...encodeInt(node.items.length)); node.items.forEach((i) => encodeValue(i, out)); break;
-      case T.MAP: out.push(node.kt, node.vt, ...encodeInt(node.entries.length)); node.entries.forEach(({ k, v }) => { encodeValue(k, out); encodeValue(v, out); }); break;
-      case T.FLOAT: out.push(...encodeFloat(node.v)); break;
-      default: throw new Error(`Unknown TDF type ${node.t}.`);
-    }
-  }
-  function encodeFields(list, out) {
-    list.forEach(({ tag, node }) => { out.push(...tagToBytes(tag), node.t); encodeValue(node, out); });
-  }
+  // Collects byte chunks (embedded images can be megabytes) and joins them once.
   function encode(rootNode) {
-    const out = [];
-    encodeFields(rootNode.fields, out);
-    return Uint8Array.from(out);
+    const chunks = [];
+    let size = 0;
+    const put = (b) => { chunks.push(b); size += b.length; };
+    const byte = (...b) => put(Uint8Array.from(b));
+    function value(node) {
+      switch (node.t) {
+        case T.INT: put(encodeInt(node.v)); break;
+        case T.STRING: put(encodeString(node.v)); break;
+        case T.BLOB: put(encodeInt(node.bytes.length)); put(node.bytes); break;
+        case T.STRUCT: fields(node.fields); byte(0); break;
+        case T.LIST: byte(node.et); put(encodeInt(node.items.length)); node.items.forEach(value); break;
+        case T.MAP: byte(node.kt, node.vt); put(encodeInt(node.entries.length)); node.entries.forEach(({ k, v }) => { value(k); value(v); }); break;
+        case T.FLOAT: put(encodeFloat(node.v)); break;
+        default: throw new Error(`Unknown TDF type ${node.t}.`);
+      }
+    }
+    function fields(list) {
+      list.forEach(({ tag, node }) => { byte(...tagToBytes(tag), node.t); value(node); });
+    }
+    fields(rootNode.fields);
+    const out = new Uint8Array(size);
+    let o = 0;
+    chunks.forEach((c) => { out.set(c, o); o += c.length; });
+    return out;
   }
 
   // Replaces byte ranges [s, e) with new bytes. Ranges must not overlap.

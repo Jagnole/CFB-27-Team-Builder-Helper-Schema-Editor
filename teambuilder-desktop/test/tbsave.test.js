@@ -9,8 +9,16 @@ const M = require('../src/core/model.js');
 
 const data = JSON.parse(fs.readFileSync(path.join(__dirname, '../src/data/tb-data.json'), 'utf8'));
 const sample = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures/sample-team.json'), 'utf8'));
-// No real save ships with the tests; build one from the sample team the way a
-// save stores it (TDF with the same tags), in a package laid out like a real one.
+// No real save ships with the tests (they hold a whole team); build one from the
+// sample team the way a save stores it: TDF with the same tags, every jersey
+// carrying a width for each number 10-99, in a package laid out like a real one.
+Object.values(sample.teamData.frostbiteData.uniformParts.jerseys).forEach((j) => {
+  const nms = j.numberMaterialSettings;
+  if (!nms) return;
+  const base = nms.offsetScaleSpacing.numberSpacing.x;
+  const own = new Map((nms.playerNumberAdjust || []).map((a) => [a.number, a.width]));
+  nms.playerNumberAdjust = Array.from({ length: 90 }, (_, i) => ({ number: i + 10, width: own.has(i + 10) ? own.get(i + 10) : base }));
+});
 const plain = TbSave.fromJson(sample);
 const pkgBytes = TbPackage.buildPackage(plain, { size: TbPackage.KNOWN_LAYOUT.size });
 const open = () => {
@@ -111,4 +119,23 @@ test('editors skip fields a save file does not have instead of adding them', () 
   assert.ok(!('colorB' in tint), 'unset channel is absent in a save file');
   assert.equal(M.setNumberColor(jersey, 'colorB', '#123456'), false);
   assert.ok(!('colorB' in tint));
+});
+
+test('per-number spacing in a save: fonts set every number, the slider shifts them all', () => {
+  const { pkg, view, payload } = open();
+  const jersey = M.getPart(payload, M.deriveVariants(payload)[0], 'jersey');
+  const list = jersey.numberMaterialSettings.playerNumberAdjust;
+  assert.equal(list.length, 90);
+  const font = M.listNumberFonts(data).find((f) => (data.numberLayoutProfiles[f.displayName] || {}).playerNumberAdjust);
+  const prof = data.numberLayoutProfiles[font.displayName];
+  assert.ok(M.applyNumberFont(jersey, font, data).profileApplied.includes('per-number kerning'));
+  const listed = prof.playerNumberAdjust[0];
+  assert.equal(list.find((e) => e.number === listed.number).width, listed.width);
+  const unlisted = list.find((e) => !prof.playerNumberAdjust.some((a) => a.number === e.number));
+  assert.equal(unlisted.width, prof.numberSpacing);
+  const before = list.map((e) => e.width);
+  M.setNumberSpacing(jersey, M.getNumberSpacing(jersey) + 0.05);
+  list.forEach((e, i) => assert.ok(Math.abs(e.width - before[i] - 0.05) < 1e-6));
+  const r = TbSave.applyView(pkg.plain, view.leaves, payload);
+  assert.deepEqual(r.problems, []);
 });

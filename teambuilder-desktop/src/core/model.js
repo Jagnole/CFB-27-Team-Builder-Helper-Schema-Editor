@@ -126,8 +126,14 @@
     let v = String(value);
     if (field.maxLength) v = v.slice(0, field.maxLength);
     infos[key] = v;
-    const meta = getDeep(payload, ['teamData', 'metadata']);
-    if (field.metadataKey && meta && field.metadataKey in meta) meta[field.metadataKey] = v;
+    // Display metadata sits at the file root in real team files and saves
+    // (older captures had it under teamData). Keep each value's type: saves
+    // store metadata as text, the website JSON stores yearFounded as a number.
+    [getDeep(payload, ['metadata']), getDeep(payload, ['teamData', 'metadata'])].forEach((meta) => {
+      if (!field.metadataKey || !meta || !(field.metadataKey in meta)) return;
+      const n = Number(v);
+      meta[field.metadataKey] = typeof meta[field.metadataKey] === 'number' && v !== '' && Number.isFinite(n) ? n : v;
+    });
     return true;
   }
 
@@ -259,7 +265,15 @@
           applied.push(f.replace('NumberOffsetScale', ' placement'));
         }
       });
-      if (profile.playerNumberAdjust &&
+      const list = getDeep(part, ['numberMaterialSettings', 'playerNumberAdjust']);
+      if (isFullNumberList(list) && (profile.playerNumberAdjust || typeof profile.numberSpacing === 'number')) {
+        // Save files hold a width for every number 10-99 and the game uses those,
+        // so set each one: the font's own value where it has one, else its base spacing.
+        const own = new Map((profile.playerNumberAdjust || []).map((a) => [a.number, a.width]));
+        const base = typeof profile.numberSpacing === 'number' ? profile.numberSpacing : getNumberSpacing(part);
+        list.forEach((e) => { e.width = own.has(e.number) ? own.get(e.number) : base; });
+        applied.push('per-number kerning');
+      } else if (profile.playerNumberAdjust &&
           setDeep(part, ['numberMaterialSettings', 'playerNumberAdjust'], clone(profile.playerNumberAdjust))) {
         applied.push('per-number kerning');
       }
@@ -305,9 +319,25 @@
     return typeof v === 'number' ? v : null;
   }
 
+  // A width for (nearly) every two-digit number, as TEAMBUILDER save files keep
+  // them, rather than the website JSON's short list of overrides.
+  function isFullNumberList(list) {
+    return Array.isArray(list) && list.length >= 80 &&
+      list.every((e) => e && typeof e.number === 'number' && typeof e.width === 'number');
+  }
+
+  // Moves the base spacing. Per-number widths move by the same amount so each
+  // number keeps its tuning relative to the rest (11 stays tighter than 27).
   function setNumberSpacing(part, value) {
     const v = Math.max(NUMBER_SPACING_MIN, Math.min(NUMBER_SPACING_MAX, Number(value)));
-    return Number.isFinite(v) && setDeep(part, NUMBER_SPACING_PATH, v);
+    const before = getNumberSpacing(part);
+    if (!Number.isFinite(v) || !setDeep(part, NUMBER_SPACING_PATH, v)) return false;
+    const list = getDeep(part, ['numberMaterialSettings', 'playerNumberAdjust']);
+    if (Array.isArray(list) && before !== null) {
+      const delta = v - before;
+      list.forEach((e) => { if (e && typeof e.width === 'number') e.width = Math.round((e.width + delta) * 1e6) / 1e6; });
+    }
+    return true;
   }
 
   function numberSizePath(field) {
@@ -473,13 +503,14 @@
           (getDeep(part, [comp, 'overlays']) || []).forEach((o, i) => {
             Object.entries((o && o.textures) || {}).forEach(([slot, t]) => {
               const id = t && t.textureId;
-              if (typeof id !== 'string' || id.includes('/')) return;
+              if (typeof id !== 'string' || !id || id.includes('/')) return; // save files keep unused slots as "".
               out.push({
                 plural, key, comp, index: i, slot, textureId: id,
                 label: getDeep(o, ['info', 'label']) || `Layer ${i + 1}`,
                 present: !!textures[id],
-                url: (textures[id] && textures[id].url) || null,
-                embedded: !!(textures[id] && !textures[id].url), // save files carry the image itself
+                // Save files carry the image itself (shown from its embedded PNG).
+                url: (textures[id] && (textures[id].url || (textures[id].data && textures[id].data.png))) || null,
+                embedded: !!(textures[id] && !textures[id].url),
                 rsm: getDeep(o, ['rsm', 'rsmR']) || null,
               });
             });
