@@ -108,7 +108,10 @@
     $('teamBadgeName').textContent = M.teamTitle(p);
     $('teamBadgeSource').textContent = state.source.kind === 'capture'
       ? `From Team Builder · original kept at ${state.source.path}`
-      : `From file · ${state.source.path}`;
+      : state.source.kind === 'tbsave'
+        ? `TEAMBUILDER save · ${state.source.name} · backup verified`
+        : `From file · ${state.source.path}`;
+    $('btnSave').textContent = state.source.kind === 'tbsave' ? 'Save TEAMBUILDER file' : 'Save .json';
     const logo = teamLogoUrl(p);
     $('teamLogo').hidden = !logo;
     if (logo) $('teamLogo').src = logo;
@@ -303,7 +306,13 @@
         h('section', { class: 'card start-card' },
           h('h2', { text: '2 · Or open a saved team .json' }),
           h('p', { class: 'hint', text: 'Any team JSON exported from Team Builder or saved from this app. Your original file is never overwritten.' }),
-          h('button', { class: 'btn', text: 'Open .json file', onclick: openFile }))),
+          h('button', { class: 'btn', text: 'Open .json file', onclick: openFile })),
+        h('section', { class: 'card start-card' },
+          h('h2', { text: '3 · Or edit a TEAMBUILDER save file' }),
+          h('p', { class: 'hint', text: 'Edit the game\'s TEAMBUILDER save directly, like the Offline Editor: fonts, number colors, spacing and size, helmet finish, brand logo and team info. A verified backup is made first, and edits are saved to a new file.' }),
+          h('div', { class: 'row' },
+            h('button', { class: 'btn', text: 'Open save file', onclick: openSaveFile }),
+            api ? h('button', { class: 'btn small ghost', text: 'Backups folder', onclick: () => api.openBackupsFolder() }) : null))),
       h('div', { class: 'capture-list' },
         h('div', { class: 'row' },
           h('div', { class: 'section-label', text: 'Teams grabbed this session' }),
@@ -946,14 +955,14 @@
       layers.map((l) => {
         const metal = l.rsm && typeof l.rsm.metalMask === 'number' ? l.rsm.metalMask : null;
         return h('div', { class: 'custom-layer' },
-          h('div', { class: 'custom-thumb' }, l.url ? h('img', { src: l.url, alt: '', loading: 'lazy' }) : h('span', { class: 'small', text: 'missing' })),
+          h('div', { class: 'custom-thumb' }, l.url ? h('img', { src: l.url, alt: '', loading: 'lazy' }) : h('span', { class: 'small', text: l.embedded ? 'in save' : 'missing' })),
           h('div', { class: 'grow' },
             h('div', { text: `${keys.get(l.key)} · ${l.label}` }),
             h('div', { class: 'small muted', text: l.rsm ? `Metal ${pct(metal || 0)} · Smoothness ${pct(l.rsm.smoothness || 0)} · Reflectance ${pct(l.rsm.reflectance || 0)}` : 'Default finish' }),
             metal !== null && metal >= 0.5
               ? h('div', { class: 'small warn-text', text: 'Mostly metallic: it reflects its surroundings more than it shows its own colors, so previews with little lighting (like Frosty\'s) can show it as a gray shape.' })
               : null,
-            l.url ? null : h('div', { class: 'small err-text', text: 'The image link is missing from this file.' })));
+            l.present ? null : h('div', { class: 'small err-text', text: 'The image link is missing from this file.' })));
       }));
   }
 
@@ -1042,14 +1051,23 @@
     setStatus('Team Builder window open. Sign in, open your team and click Edit.');
   }
 
-  async function openFile() {
+  async function openFile(opts) {
     if (!api) return toast('Opening files only works inside the desktop app.', 'err');
     if (!confirmReplace()) return;
     try {
-      const f = await api.openFile();
-      if (f) loadPayload(f.text, { kind: 'file', path: f.path, name: f.name });
-    } catch (err) { toast(err.message, 'err'); }
+      const f = await api.openFile(opts && opts.saveFile ? { saveFile: true } : {});
+      if (!f) return;
+      if (f.save) {
+        if (loadPayload(f.text, { kind: 'tbsave', path: f.path, name: f.name, save: f.save })) {
+          toast(`Opened ${f.name}. A verified backup was saved first.${f.save.knownLayout ? '' : ' This save has an unusual layout, so check the result in game.'}`);
+        }
+        return;
+      }
+      loadPayload(f.text, { kind: 'file', path: f.path, name: f.name });
+    } catch (err) { toast(err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), 'err'); }
   }
+
+  const openSaveFile = () => openFile({ saveFile: true });
 
   async function openCapture(id) {
     if (!confirmReplace()) return;
@@ -1059,8 +1077,22 @@
     } catch (err) { toast(err.message, 'err'); }
   }
 
+  async function saveTbFile() {
+    const text = M.serialize(state.payload);
+    const r = await api.saveTbFile({ id: state.source.save.id, text, suggestedName: `${state.source.name} edited` });
+    if (!r) return;
+    if (r.error) {
+      toast(r.problems && r.problems.length ? `${r.error} ${r.problems.slice(0, 3).join(' ')}${r.problems.length > 3 ? ` …and ${r.problems.length - 3} more.` : ''}` : r.error, 'err');
+      return;
+    }
+    state.savedText = text;
+    edited(`Saved to ${r.path}`);
+    toast(`Saved ${r.changed} change${r.changed === 1 ? '' : 's'} to ${r.path}. Your original save is untouched.`);
+  }
+
   async function save() {
     if (!state.payload || !api) return;
+    if (state.source && state.source.kind === 'tbsave') { await saveTbFile(); return; }
     const problems = M.checkCustomLayers(state.original, state.payload);
     if (problems.length && !confirm(`Your uploaded images don't all match the team as it was loaded:\n\n• ${problems.slice(0, 8).join('\n• ')}${problems.length > 8 ? `\n…and ${problems.length - 8} more` : ''}\n\nThese layers may show up blank or wrong after the MMC import. Save anyway?`)) return;
     const text = M.serialize(state.payload);

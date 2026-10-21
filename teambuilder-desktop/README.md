@@ -98,6 +98,27 @@ the file you save goes straight into MMC with no conversion step.
   Check it in game. To rule out this app, import the untouched original from
   **Start → Open captures folder** and compare.
 
+## Editing a TEAMBUILDER save file directly
+
+You can also edit the game's TEAMBUILDER save file instead of the website JSON,
+as the CFB TEAMBUILDER Offline Editor (by JCothron2) does. Use **Start → Open
+save file**; **Open file** also recognizes a save by its header.
+
+- The same editors work: team name and colors, number font (with previews),
+  number colors, spacing and size, helmet finish, brand logo and logo colors,
+  and the change list.
+- **Your original is never changed.** A copy is saved to the backups folder
+  and checked before the save is opened (Start → Backups folder). Edits are
+  saved to a new file you name.
+- **Only what you edited is rewritten.** Each changed value goes back into its
+  exact spot. The team data is recompressed into the same space with the same
+  header and file size, then unpacked again and compared with what's on screen
+  before anything is written.
+- Some things a save file can't take, such as fields it doesn't already have
+  or new list entries (per-number spacing, for example). Editors skip those on
+  save files. If something still can't be stored, the save is refused with a
+  list of what and why; nothing is dropped silently.
+
 ## Themes
 
 Pick a color theme under **Theme** at the bottom of the sidebar. The app
@@ -232,4 +253,10 @@ in `tb-data.json`:
   colors. The two metallic Diamond decals use the Offline Editor's art as a
   grayscale shading map, tinted with the logo's main color, so they keep
   their shine in any color. `tools/build-decal-previews.js` regenerates them.
+- `src/core/tdf.js`, `src/core/tbsave.js`, `src/tbpackage.js`: TEAMBUILDER
+  save files. The package is an `FBCHUNKS` header plus one zlib stream,
+  zero-padded to a fixed size. Inside is TDF-encoded team data with 4-letter
+  tags (`TDAT/FDAT/TMUF/JRSY/…` = teamData/frostbiteData/uniformParts/
+  jerseys/…), mapped onto the website JSON shape so every editor works on it.
+  Format details follow the Offline Editor.
 - `src/renderer/`: the UI. Plain HTML, CSS and JS, with no framework.

@@ -55,12 +55,15 @@
 
   // Never creates missing intermediate nodes: writing into structure the
   // website didn't produce is exactly how a file ends up importing wrong.
+  // Replaces an existing value. Never adds fields: a team file only gets the
+  // keys it already has, and a TEAMBUILDER save file can't take new ones.
   function setDeep(obj, path, value) {
     let cur = obj;
     for (let i = 0; i < path.length - 1; i++) {
       if (cur[path[i]] == null || typeof cur[path[i]] !== 'object') return false;
       cur = cur[path[i]];
     }
+    if (!(path[path.length - 1] in cur)) return false;
     cur[path[path.length - 1]] = value;
     return true;
   }
@@ -187,7 +190,8 @@
       .map((u) => u.displayName).filter(Boolean);
     return order.map((s) => {
       const nice = displayNames.find((d) => d.replace(/\s+/g, '').toLowerCase() === s.toLowerCase());
-      return { label: nice || s.replace(/([a-z])([A-Z])/g, '$1 $2'), ...groups[s] };
+      const fallback = s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase());
+      return { label: nice || fallback, ...groups[s] };
     });
   }
 
@@ -284,7 +288,9 @@
   function setNumberColor(part, channel, hex) {
     const u = hexToUnit(hex);
     const tint = getDeep(part, ['numberComp', 'overlays', 0, 'tint']);
-    if (!u || !tint) return false;
+    // Only channels the tint has (team JSON lists unset ones as null; a save
+    // file leaves them out, and a new field can't be added to a save file).
+    if (!u || !tint || !(channel in tint)) return false;
     tint[channel] = u;
     // Team files store the mode as numeric `tintMode` (0 = tint with these
     // values, as on every tinted layer). Earlier versions of this app (and
@@ -433,7 +439,7 @@
     let n = 0;
     findVendorDecalOverlays(part).forEach((i) => {
       const tint = getDeep(part, ['layerCompTexture', 'overlays', i, 'tint']);
-      if (tint && (isColor(tint[channel]) || (allowUnset && tint[channel] == null))) { tint[channel] = u; n++; }
+      if (tint && (isColor(tint[channel]) || (allowUnset && channel in tint && tint[channel] === null))) { tint[channel] = u; n++; }
     });
     return n > 0;
   }
@@ -471,7 +477,9 @@
               out.push({
                 plural, key, comp, index: i, slot, textureId: id,
                 label: getDeep(o, ['info', 'label']) || `Layer ${i + 1}`,
+                present: !!textures[id],
                 url: (textures[id] && textures[id].url) || null,
+                embedded: !!(textures[id] && !textures[id].url), // save files carry the image itself
                 rsm: getDeep(o, ['rsm', 'rsmR']) || null,
               });
             });
@@ -488,7 +496,7 @@
     const problems = [];
     const id = (l) => `${l.plural}/${l.key}/${l.comp}/${l.index}/${l.slot}`;
     const now = listCustomLayers(current);
-    now.filter((l) => !l.url).forEach((l) => problems.push(`${l.key} › ${l.label}: its image (${l.textureId}) is missing from the file.`));
+    now.filter((l) => !l.present).forEach((l) => problems.push(`${l.key} › ${l.label}: its image (${l.textureId}) is missing from the file.`));
     const before = new Map(listCustomLayers(original).map((l) => [id(l), l]));
     const after = new Map(now.map((l) => [id(l), l]));
     before.forEach((l, k) => {

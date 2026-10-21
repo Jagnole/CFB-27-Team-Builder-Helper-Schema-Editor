@@ -2,7 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electro
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
+const crypto = require('crypto');
 const { mergeExtraFonts } = require('./core/model.js');
+const Tdf = require('./core/tdf.js');
+const TbSave = require('./core/tbsave.js');
+const TbPackage = require('./tbpackage.js');
 
 const PREVIEW_DIR = path.join(__dirname, 'assets', 'number-previews');
 const DECAL_PREVIEW_DIR = path.join(__dirname, 'assets', 'decal-previews');
@@ -17,6 +21,31 @@ const captures = [];
 const inFlight = new Set();
 
 const capturesDir = () => path.join(app.getPath('userData'), 'captures');
+const backupsDir = () => path.join(app.getPath('userData'), 'backups');
+const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
+
+// Open TEAMBUILDER save files: the untouched original bytes and where every
+// value came from, so a save only rewrites what was edited.
+const saveSessions = new Map();
+
+function openSaveFile(file, buf) {
+  const pkg = TbPackage.readPackage(buf);
+  const root = Tdf.decode(pkg.plain);
+  const view = TbSave.toView(root);
+  if (!view.payload.teamData) throw new Error('No team data found in this save file.');
+  // Keep a verified copy of the original before anything else happens.
+  fs.mkdirSync(backupsDir(), { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const backup = path.join(backupsDir(), `${safeName(path.basename(file))}-${stamp}.bak`);
+  fs.writeFileSync(backup, buf);
+  if (sha256(fs.readFileSync(backup)) !== sha256(buf)) throw new Error('Could not verify the backup copy, so the save file was not opened.');
+  const id = crypto.randomUUID();
+  saveSessions.set(id, { file, original: buf, pkg, leaves: view.leaves });
+  return {
+    path: file, name: path.basename(file), text: JSON.stringify(view.payload),
+    save: { id, backup, knownLayout: pkg.knownLayout },
+  };
+}
 const safeName = (s) => String(s || 'team').replace(/[^a-z0-9 _-]+/gi, '').trim().replace(/\s+/g, '-') || 'team';
 
 function createMainWindow() {
@@ -213,17 +242,52 @@ function registerIpc() {
     return { text: c.text, name: c.teamName, path: c.savedTo };
   });
 
-  ipcMain.handle('tb:open-file', async () => {
+  // Opens a team .json or, detected by its header, a TEAMBUILDER save file.
+  ipcMain.handle('tb:open-file', async (_e, { saveFile } = {}) => {
     const r = await dialog.showOpenDialog(mainWindow, {
-      title: 'Open a Team Builder team .json',
-      filters: [{ name: 'Team JSON', extensions: ['json'] }, { name: 'All files', extensions: ['*'] }],
+      title: saveFile ? 'Open a TEAMBUILDER save file' : 'Open a team .json or TEAMBUILDER save',
+      filters: saveFile
+        ? [{ name: 'All files', extensions: ['*'] }]
+        : [{ name: 'Team JSON', extensions: ['json'] }, { name: 'All files', extensions: ['*'] }],
       properties: ['openFile'],
     });
     if (r.canceled || !r.filePaths.length) return null;
     const file = r.filePaths[0];
     const stat = fs.statSync(file);
-    if (stat.size > 64 * 1024 * 1024) throw new Error('That file is too large to be a team JSON.');
-    return { path: file, name: path.basename(file), text: fs.readFileSync(file, 'utf8') };
+    if (stat.size > 64 * 1024 * 1024) throw new Error('That file is too large to be a team file.');
+    const buf = fs.readFileSync(file);
+    if (TbPackage.isPackage(buf)) return openSaveFile(file, buf);
+    if (saveFile) throw new Error('That is not a TEAMBUILDER save file (it has no FBCHUNKS header).');
+    return { path: file, name: path.basename(file), text: buf.toString('utf8') };
+  });
+
+  // Writes edits into a copy of the opened save file. Only changed values are
+  // rewritten; the result is unpacked and compared before anything is written.
+  ipcMain.handle('tb:save-tb-file', async (_e, { id, text, suggestedName }) => {
+    const sess = saveSessions.get(id);
+    if (!sess) return { error: 'That save file is no longer open. Open it again.' };
+    const result = TbSave.applyView(sess.pkg.plain, sess.leaves, JSON.parse(text));
+    if (result.problems.length) return { error: 'Some edits can\'t be stored in a TEAMBUILDER save file.', problems: result.problems };
+    const out = TbPackage.writePackage(sess.original, sess.pkg, result.bytes);
+    const r = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save edited TEAMBUILDER file',
+      defaultPath: path.join(path.dirname(sess.file), `${safeName(suggestedName || path.basename(sess.file))}`),
+      filters: [{ name: 'All files', extensions: ['*'] }],
+    });
+    if (r.canceled || !r.filePath) return null;
+    if (samePath(r.filePath, sess.file)) {
+      return { error: 'That is your original save file. Choose a different name so the original stays untouched (a backup is also kept).' };
+    }
+    fs.writeFileSync(r.filePath, out);
+    if (sha256(fs.readFileSync(r.filePath)) !== sha256(out)) {
+      return { error: 'The file was written but could not be verified. Try saving again.' };
+    }
+    return { path: r.filePath, changed: result.changed };
+  });
+
+  ipcMain.handle('tb:open-backups-folder', () => {
+    fs.mkdirSync(backupsDir(), { recursive: true });
+    return shell.openPath(backupsDir());
   });
 
   ipcMain.handle('tb:save-file', async (_e, { text, suggestedName, protectedPaths }) => {
